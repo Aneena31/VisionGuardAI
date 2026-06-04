@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from typing import Optional
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 from pipeline import aggregation, ai_summary, config, ingest, ml, rules, scoring, similarity, stats
 

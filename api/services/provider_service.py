@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from math import ceil
+from typing import Optional
 
 from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
