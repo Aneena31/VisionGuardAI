@@ -1,0 +1,70 @@
+"""Centralized VisionGuard pipeline configuration.
+
+All tunable thresholds and weights live in this module.
+"""
+
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_DATA_FILE_PATH = BASE_DIR / "data" / "Sample_Data_for_ML.xlsx"
+DEFAULT_ARTIFACTS_PATH = BASE_DIR / "artifacts"
+
+# Rule thresholds
+THRESHOLD_HIGHCOST_FRAME = 150
+THRESHOLD_HIGHCOST_LENS = 200
+THRESHOLD_HIGHCOST_MATERIAL = 250
+THRESHOLD_BILLED_RATIO = 2.0
+THRESHOLD_HIGH_UNITS = 3
+THRESHOLD_YOUNG_MEMBER_AGE = 18
+
+# Rule weights
+RULE_WEIGHTS = {
+    "R001": 3,
+    "R002": 2,
+    "R003": 2,
+    "R004": 1,
+    "R005": 2,
+    "R006": 3,
+    "R007": 3,
+    "R008": 4,
+    "R009": 4,
+    "R010": 2,
+    "R011": 3,
+}
+MAX_RULE_SCORE = sum(RULE_WEIGHTS.values())
+
+# ML thresholds
+IF_CONTAMINATION = 0.03
+IF_N_ESTIMATORS = 200
+IF_RANDOM_STATE = 42
+PCA_VARIANCE_RETAINED = 0.95
+ML_ANOMALY_FLAG_THRESHOLD = 70
+
+# Statistical thresholds
+ML_FLAG_CLAIM_SCORE_THRESHOLD = 70
+ML_FLAG_PROVIDER_SCORE_THRESHOLD = 80
+NARRATIVE_ZSCORE_THRESHOLD = 2.5
+
+# Final scoring weights
+WEIGHT_RULE = 0.35
+WEIGHT_CLAIM_STAT = 0.20
+WEIGHT_PROV_STAT = 0.20
+WEIGHT_ML = 0.25
+
+# Risk level thresholds
+RISK_CRITICAL = 80
+RISK_HIGH = 60
+RISK_MEDIUM = 40
+
+# Provider gold weights
+PROVIDER_WEIGHT_HIGH_RISK_RATIO = 0.35
+PROVIDER_WEIGHT_AVG_FINAL = 0.25
+PROVIDER_WEIGHT_AVG_ML = 0.25
+PROVIDER_WEIGHT_AVG_PROV_STAT = 0.15
+
+# AI summary
+AI_SUMMARY_SCORE_THRESHOLD = 40
+AI_RATE_LIMIT_SLEEP = 0.3
+OPENAI_MODEL_DEFAULT = "gpt-4o-mini"
+

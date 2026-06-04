@@ -1,0 +1,8 @@
+{
+  "name": "VisionGuard AI",
+  "description": "Fraud Analytics and Insurance Claim Investigation Platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
