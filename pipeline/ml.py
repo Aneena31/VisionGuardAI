@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import joblib
 import numpy as np
@@ -59,7 +59,7 @@ def apply_unsupervised_ml(df: pd.DataFrame):
     return out, scaler, iso, pca, ML_FEATURES
 
 
-def save_artifacts(scaler, iso, pca, ml_features, path: str | Path, score_stats: dict | None = None):
+def save_artifacts(scaler, iso, pca, ml_features, path: str | Path, score_stats: Optional[dict] = None):
     """Persist ML artifacts for API startup reuse."""
     artifact_path = Path(path)
     artifact_path.mkdir(parents=True, exist_ok=True)

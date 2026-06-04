@@ -5,7 +5,7 @@ import os
 from pipeline import aggregation, ai_summary, config, ingest, ml, rules, scoring, similarity, stats
 
 
-def run_batch(file_path: str | None = None):
+def run_batch(file_path: Optional[str] = None):
     """Run the full historical batch pipeline."""
     source = file_path or os.getenv("DATA_FILE_PATH", str(config.DEFAULT_DATA_FILE_PATH))
     df = ingest.load_and_clean(source)

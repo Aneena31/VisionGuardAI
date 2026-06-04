@@ -12,6 +12,7 @@ from api.schemas.scoring import ScoringJobCreate
 from api.services import scoring_service
 from db.database import get_db
 from db.models import ScoringJob
+from typing import Optional
 
 
 router = APIRouter(prefix="/api/scoring", tags=["scoring"])
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/api/scoring", tags=["scoring"])
 async def create_scoring_job(
     request: Request,
     background_tasks: BackgroundTasks,
-    file: UploadFile | None = File(None),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
     source_type, claim_input = await _extract_claim_input(request, file)
@@ -71,7 +72,7 @@ def assign_siu(job_id: str, request: Request, db: Session = Depends(get_db)):
     return make_response(scoring_service.assign_siu(db, job), request.state.request_id)
 
 
-async def _extract_claim_input(request: Request, file: UploadFile | None) -> tuple[str, dict]:
+async def _extract_claim_input(request: Request, file: Optional[UploadFile]) -> tuple[str, dict]:
     if file:
         raw = await file.read()
         name = (file.filename or "").lower()

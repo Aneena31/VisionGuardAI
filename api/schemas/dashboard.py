@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 class KpiMetric(BaseModel):
     value: float | int
-    trendPercent: float | None = None
-    trendDirection: str | None = None
-    shareOfTotalPercent: float | None = None
+    trendPercent: Optional[float] = None
+    trendDirection: Optional[str] = None
+    shareOfTotalPercent: Optional[float] = None
 
 
 class DashboardOverview(BaseModel):

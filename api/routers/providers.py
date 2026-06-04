@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from api.schemas.common import make_response
 from api.services import provider_service
 from db.database import get_db
+from typing import Optional
 
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
@@ -14,8 +15,8 @@ router = APIRouter(prefix="/api/providers", tags=["providers"])
 @router.get("")
 def list_providers(
     request: Request,
-    search: str | None = None,
-    riskLevel: str | None = None,
+    search: Optional[str] = None,
+    riskLevel: Optional[str] = None,
     page: int = 1,
     pageSize: int = Query(50, le=100),
     sortBy: str = "riskScore",

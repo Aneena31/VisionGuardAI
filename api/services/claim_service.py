@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 from math import ceil
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import asc, desc, or_
 from sqlalchemy.orm import Session
@@ -41,16 +41,16 @@ CLUSTER_DEFINITIONS = {
 
 def list_claims(
     db: Session,
-    search: str | None = None,
-    risk_level: str | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
-    provider_id: str | None = None,
-    procedure_code: str | None = None,
-    fraud_type: str | None = None,
-    status: str | None = None,
-    min_fraud_score: float | None = None,
-    max_fraud_score: float | None = None,
+    search: Optional[str] = None,
+    risk_level: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    provider_id: Optional[str] = None,
+    procedure_code: Optional[str] = None,
+    fraud_type: Optional[str] = None,
+    status: Optional[str] = None,
+    min_fraud_score: Optional[float] = None,
+    max_fraud_score: Optional[float] = None,
     page: int = 1,
     page_size: int = 25,
     sort_by: str = "fraudScore",
@@ -103,7 +103,7 @@ def list_claims(
     }
 
 
-def get_claim_analysis(db: Session, claim_id: str) -> dict | None:
+def get_claim_analysis(db: Session, claim_id: str) -> Optional[dict]:
     claim = db.get(Claim, claim_id)
     if not claim:
         return None
@@ -111,7 +111,7 @@ def get_claim_analysis(db: Session, claim_id: str) -> dict | None:
     return build_claim_analysis(claim, provider)
 
 
-def flag_claim(db: Session, claim_id: str) -> dict | None:
+def flag_claim(db: Session, claim_id: str) -> Optional[dict]:
     claim = db.get(Claim, claim_id)
     if not claim:
         return None
@@ -163,7 +163,7 @@ def claim_summary(claim: Claim) -> dict:
     }
 
 
-def build_claim_analysis(claim: Claim, provider: ProviderGold | None = None) -> dict:
+def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None) -> dict:
     ai_summary = _json_or_default(claim.ai_summary, {})
     cluster = CLUSTER_DEFINITIONS.get(claim.cluster_id or "CL-00", CLUSTER_DEFINITIONS["CL-00"]).copy()
     cluster["claimCount"] = 0
@@ -282,7 +282,7 @@ def _pipeline_context(claim: Claim) -> dict:
     }
 
 
-def _triggered_rules(rule_narrative: str | None) -> list[dict]:
+def _triggered_rules(rule_narrative: Optional[str]) -> list[dict]:
     if not rule_narrative or rule_narrative == "No deterministic rules triggered.":
         return []
     items = []
@@ -293,7 +293,7 @@ def _triggered_rules(rule_narrative: str | None) -> list[dict]:
     return items
 
 
-def _json_or_default(raw: str | None, default: Any) -> Any:
+def _json_or_default(raw: Optional[str], default: Any) -> Any:
     if not raw:
         return default
     try:

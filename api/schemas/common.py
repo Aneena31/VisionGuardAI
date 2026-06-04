@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
+from typing import Optional
 
 
 T = TypeVar("T")
@@ -21,9 +22,9 @@ class ErrorSchema(BaseModel):
 
 
 class ResponseEnvelope(BaseModel, Generic[T]):
-    data: T | None
+    data: Optional[T]
     meta: ResponseMeta
-    error: ErrorSchema | None = None
+    error: Optional[ErrorSchema] = None
 
 
 class PaginationSchema(BaseModel):
