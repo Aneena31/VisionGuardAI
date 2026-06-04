@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -10,17 +10,17 @@ SourceType = Literal["x12_837", "csv", "json", "manual"]
 
 class ClaimInput(BaseModel):
     procedureCode: str
-    procedureDesc: str | None = ""
+    procedureDesc: Optional[str] = ""
     allowedAmount: float
     amtCharged: float = 0
     units: float = 1
     memberAge: int = 0
-    memberGender: str | None = None
+    memberGender: Optional[str] = None
     providerId: str
-    serviceDate: str | None = None
-    benefitType: str | None = "Other"
-    serviceCategoryName: str | None = ""
-    benefitCategoryName: str | None = ""
+    serviceDate: Optional[str] = None
+    benefitType: Optional[str] = "Other"
+    serviceCategoryName: Optional[str] = ""
+    benefitCategoryName: Optional[str] = ""
 
 
 class ScoringJobCreate(BaseModel):
@@ -46,5 +46,5 @@ class JobStatus(BaseModel):
     jobId: str
     status: str
     progressPercent: int
-    activeStage: str | None = None
+    activeStage: Optional[str] = None
     stages: list[JobStage]

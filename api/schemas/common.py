@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from pydantic import BaseModel
 
@@ -21,9 +21,9 @@ class ErrorSchema(BaseModel):
 
 
 class ResponseEnvelope(BaseModel, Generic[T]):
-    data: T | None
+    data: Optional[T]
     meta: ResponseMeta
-    error: ErrorSchema | None = None
+    error: Optional[ErrorSchema] = None
 
 
 class PaginationSchema(BaseModel):

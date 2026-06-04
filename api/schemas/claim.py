@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -8,24 +8,24 @@ from pydantic import BaseModel
 class ClaimSummary(BaseModel):
     id: str
     providerId: str
-    providerName: str | None = None
-    memberId: str | None = None
-    procedureCode: str | None = None
-    procedureDesc: str | None = None
+    providerName: Optional[str] = None
+    memberId: Optional[str] = None
+    procedureCode: Optional[str] = None
+    procedureDesc: Optional[str] = None
     allowedAmount: float
     fraudScore: float
     riskLevel: str
-    fraudType: str | None = None
-    clusterId: str | None = None
-    date: str | None = None
+    fraudType: Optional[str] = None
+    clusterId: Optional[str] = None
+    date: Optional[str] = None
     status: str
 
 
 class PipelineOutput(BaseModel):
     runId: str
     status: str
-    submittedAt: str | None = None
-    completedAt: str | None = None
+    submittedAt: Optional[str] = None
+    completedAt: Optional[str] = None
     statusText: str
 
 

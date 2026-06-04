@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from typing import Optional, Union
+
 from pydantic import BaseModel
 
 
 class KpiMetric(BaseModel):
-    value: float | int
-    trendPercent: float | None = None
-    trendDirection: str | None = None
-    shareOfTotalPercent: float | None = None
+    value: Union[float, int]
+    trendPercent: Optional[float] = None
+    trendDirection: Optional[str] = None
+    shareOfTotalPercent: Optional[float] = None
 
 
 class DashboardOverview(BaseModel):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -14,16 +16,16 @@ router = APIRouter(prefix="/api/claims", tags=["claims"])
 @router.get("")
 def list_claims(
     request: Request,
-    search: str | None = None,
-    riskLevel: str | None = None,
-    dateFrom: str | None = None,
-    dateTo: str | None = None,
-    providerId: str | None = None,
-    procedureCode: str | None = None,
-    fraudType: str | None = None,
-    status: str | None = None,
-    minFraudScore: float | None = None,
-    maxFraudScore: float | None = None,
+    search: Optional[str] = None,
+    riskLevel: Optional[str] = None,
+    dateFrom: Optional[str] = None,
+    dateTo: Optional[str] = None,
+    providerId: Optional[str] = None,
+    procedureCode: Optional[str] = None,
+    fraudType: Optional[str] = None,
+    status: Optional[str] = None,
+    minFraudScore: Optional[float] = None,
+    maxFraudScore: Optional[float] = None,
     page: int = 1,
     pageSize: int = Query(25, le=100),
     sortBy: str = "fraudScore",

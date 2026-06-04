@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from math import ceil
+from typing import Optional
 
 from sqlalchemy import asc, desc, func, or_
 from sqlalchemy.orm import Session
@@ -10,8 +11,8 @@ from db.models import Claim, ProviderGold
 
 def list_providers(
     db: Session,
-    search: str | None = None,
-    risk_level: str | None = None,
+    search: Optional[str] = None,
+    risk_level: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
     sort_by: str = "riskScore",
@@ -35,7 +36,7 @@ def list_providers(
     }
 
 
-def get_provider_detail(db: Session, provider_id: str) -> dict | None:
+def get_provider_detail(db: Session, provider_id: str) -> Optional[dict]:
     provider = db.get(ProviderGold, provider_id)
     if not provider:
         return None

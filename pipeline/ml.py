@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Optional, Union
 
 import joblib
 import numpy as np
@@ -59,7 +59,7 @@ def apply_unsupervised_ml(df: pd.DataFrame):
     return out, scaler, iso, pca, ML_FEATURES
 
 
-def save_artifacts(scaler, iso, pca, ml_features, path: str | Path, score_stats: dict | None = None):
+def save_artifacts(scaler, iso, pca, ml_features, path: Union[str, Path], score_stats: Optional[dict] = None):
     """Persist ML artifacts for API startup reuse."""
     artifact_path = Path(path)
     artifact_path.mkdir(parents=True, exist_ok=True)
@@ -72,7 +72,7 @@ def save_artifacts(scaler, iso, pca, ml_features, path: str | Path, score_stats:
         json.dump(score_stats or {}, handle)
 
 
-def load_artifacts(path: str | Path) -> dict:
+def load_artifacts(path: Union[str, Path]) -> dict:
     """Load saved artifacts without retraining."""
     artifact_path = Path(path)
     with open(artifact_path / "ml_features.json", encoding="utf-8") as handle:
@@ -91,7 +91,7 @@ def load_artifacts(path: str | Path) -> dict:
     }
 
 
-def score_single(claim_dict: dict, artifacts: dict | tuple) -> dict:
+def score_single(claim_dict: dict, artifacts: Union[dict, tuple]) -> dict:
     """Score a single claim using cached ML artifacts."""
     if isinstance(artifacts, tuple):
         scaler, iso, pca, ml_features = artifacts[:4]

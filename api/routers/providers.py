@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -14,8 +16,8 @@ router = APIRouter(prefix="/api/providers", tags=["providers"])
 @router.get("")
 def list_providers(
     request: Request,
-    search: str | None = None,
-    riskLevel: str | None = None,
+    search: Optional[str] = None,
+    riskLevel: Optional[str] = None,
     page: int = 1,
     pageSize: int = Query(50, le=100),
     sortBy: str = "riskScore",
