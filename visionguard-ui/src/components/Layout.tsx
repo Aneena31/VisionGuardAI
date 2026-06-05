@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ShieldAlert, BarChart3, Search, Users, Activity, Upload, Bell, ChevronRight, Zap } from 'lucide-react';
+import { ShieldAlert, BarChart3, Search, Users, Upload, Bell, ChevronRight, Zap, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './ui';
 import { api } from '../api';
@@ -16,11 +16,24 @@ export function Layout() {
   const location = useLocation();
   const [systemStatus, setSystemStatus] = useState({ modelAi: 'OFFLINE', pipeline: 'STALE' });
   const [unreadCount, setUnreadCount] = useState(0);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    const savedTheme = window.localStorage.getItem('visionguard-theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  });
 
   useEffect(() => {
     api.getSystemStatus().then(setSystemStatus).catch(() => undefined);
     api.getNotifications().then((data) => setUnreadCount(data.unreadCount || 0)).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-light', theme === 'light');
+    window.localStorage.setItem('visionguard-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
 
   return (
     <div className="flex h-screen w-full bg-[#05070a] text-slate-300 overflow-hidden relative font-sans">
@@ -108,6 +121,17 @@ export function Layout() {
                 className="bg-transparent border-none text-sm focus:outline-none w-full text-slate-200 placeholder:text-slate-500 transition-colors"
               />
             </div>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              aria-pressed={theme === 'light'}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              className="h-9 rounded-full border border-slate-700 bg-slate-950/50 px-3 text-xs font-bold uppercase tracking-wide text-slate-300 hover:text-white hover:bg-slate-800/50 transition-colors flex items-center gap-2"
+            >
+              {theme === 'dark' ? <Moon className="w-4 h-4 text-cyan-400" /> : <Sun className="w-4 h-4 text-cyan-500" />}
+              {theme === 'dark' ? 'Dark' : 'Light'}
+            </button>
             <div className="relative cursor-pointer">
               <Bell className="w-6 h-6 text-slate-400 hover:text-white transition-colors" />
               {unreadCount > 0 && <div className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center">{unreadCount}</div>}

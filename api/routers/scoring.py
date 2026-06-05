@@ -16,7 +16,7 @@ from db.models import ScoringJob
 from typing import Optional
 
 
-router = APIRouter(prefix="/api/scoring", tags=["scoring"])
+router = APIRouter(prefix="/visionguard/api/scoring", tags=["scoring"])
 
 
 @router.post("/jobs")

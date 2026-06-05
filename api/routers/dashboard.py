@@ -8,7 +8,7 @@ from api.services import dashboard_service
 from db.database import get_db
 
 
-router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/visionguard/api/dashboard", tags=["dashboard"])
 
 
 @router.get("/overview")

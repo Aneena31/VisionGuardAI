@@ -20,8 +20,8 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │                        API LAYER (FastAPI)                       │
 │                                                                  │
-│  /api/dashboard    /api/claims    /api/providers   /api/scoring  │
-│  /api/search       /api/notifications              /api/system   │
+│  /visionguard/api/dashboard    /visionguard/api/claims    /visionguard/api/providers   /visionguard/api/scoring  │
+│  /visionguard/api/search       /visionguard/api/notifications              /visionguard/api/system   │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                    Service Layer                          │   │
@@ -88,7 +88,7 @@ seed.py
 Single-claim scoring triggered via API. Loads saved model artifacts instead of retraining.
 
 ```
-POST /api/scoring/jobs
+POST /visionguard/api/scoring/jobs
   └── ScoringService.create_job(claim_input)
         ├── validate claim format
         ├── auto-generate ClaimId (UUID-based, e.g. "TEMP-CLAIM-{uuid4().hex[:8]}")
@@ -180,9 +180,9 @@ SessionLocal = sessionmaker(bind=engine)
 New claim scoring runs asynchronously so the UI can show pipeline progress stages.
 
 ```
-POST /api/scoring/jobs          → creates ScoringJob record, status="queued", returns jobId
-GET  /api/scoring/jobs/:jobId   → polls status + progressPercent + activeStage
-GET  /api/scoring/jobs/:jobId/result  → returns full ClaimAnalysis once status="completed"
+POST /visionguard/api/scoring/jobs          → creates ScoringJob record, status="queued", returns jobId
+GET  /visionguard/api/scoring/jobs/:jobId   → polls status + progressPercent + activeStage
+GET  /visionguard/api/scoring/jobs/:jobId/result  → returns full ClaimAnalysis once status="completed"
 ```
 
 **Implementation options:**

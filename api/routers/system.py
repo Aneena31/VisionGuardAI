@@ -8,7 +8,7 @@ from db.database import get_db
 from db.models import PipelineRun
 
 
-router = APIRouter(prefix="/api/system", tags=["system"])
+router = APIRouter(prefix="/visionguard/api/system", tags=["system"])
 
 
 @router.get("/status")

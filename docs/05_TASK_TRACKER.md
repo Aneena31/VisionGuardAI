@@ -103,26 +103,26 @@ Phase 6 - Integration + Testing
 
 ### 2.3 Dashboard Endpoint
 - [x] Create `api/routers/dashboard.py`
-- [x] `GET /api/dashboard/overview`
-- [x] `POST /api/dashboard/export`
+- [x] `GET /visionguard/api/dashboard/overview`
+- [x] `POST /visionguard/api/dashboard/export`
 
 ### 2.4 Claims Endpoints
 - [x] Create `api/routers/claims.py`
-- [x] `GET /api/claims`
+- [x] `GET /visionguard/api/claims`
 - [x] Search/filter/sort/paginate
-- [x] `GET /api/claims/:claimId`
-- [x] `POST /api/claims/:claimId/flag-siu`
-- [x] `GET /api/claims/:claimId/report`
+- [x] `GET /visionguard/api/claims/:claimId`
+- [x] `POST /visionguard/api/claims/:claimId/flag-siu`
+- [x] `GET /visionguard/api/claims/:claimId/report`
 
 ### 2.5 Provider Endpoints
 - [x] Create `api/routers/providers.py`
-- [x] `GET /api/providers`
-- [x] `GET /api/providers/:providerId`
+- [x] `GET /visionguard/api/providers`
+- [x] `GET /visionguard/api/providers/:providerId`
 - [x] Dynamic `procedurePeerComparison`
 
 ### 2.6 System Status Endpoint
 - [x] Create `api/routers/system.py`
-- [x] `GET /api/system/status`
+- [x] `GET /visionguard/api/system/status`
 
 ---
 
@@ -149,10 +149,10 @@ Phase 6 - Integration + Testing
 
 ### 4.1 Scoring Router
 - [x] Create `api/routers/scoring.py`
-- [x] `POST /api/scoring/jobs`
-- [x] `GET /api/scoring/jobs/:jobId`
-- [x] `GET /api/scoring/jobs/:jobId/result`
-- [x] `POST /api/scoring/jobs/:jobId/assign-siu`
+- [x] `POST /visionguard/api/scoring/jobs`
+- [x] `GET /visionguard/api/scoring/jobs/:jobId`
+- [x] `GET /visionguard/api/scoring/jobs/:jobId/result`
+- [x] `POST /visionguard/api/scoring/jobs/:jobId/assign-siu`
 
 ### 4.2 Pipeline Background Task
 - [x] Create `api/services/scoring_service.py`
@@ -173,8 +173,8 @@ Phase 6 - Integration + Testing
 - [x] Claim SIU flag action
 - [x] Claim report static response
 - [x] Dashboard export static response
-- [x] `GET /api/search?query=`
-- [x] `GET /api/notifications`
+- [x] `GET /visionguard/api/search?query=`
+- [x] `GET /visionguard/api/notifications`
 - [x] Optional notification read endpoint
 
 ---
@@ -191,8 +191,8 @@ Phase 6 - Integration + Testing
 - [x] `python -m compileall pipeline db api`
 - [x] FastAPI import and schema initialization
 - [x] `GET /health` returns envelope
-- [x] `GET /api/system/status` returns envelope
-- [x] `GET /api/dashboard/overview` returns envelope on empty DB
+- [x] `GET /visionguard/api/system/status` returns envelope
+- [x] `GET /visionguard/api/dashboard/overview` returns envelope on empty DB
 - [x] Missing workbook fails clearly in `db/seed.py`
 - [x] Scoring endpoint returns envelope-shaped 503 before artifacts exist
 - [x] Seeded dashboard, claims, providers, claim detail, provider detail, scoring job status/result

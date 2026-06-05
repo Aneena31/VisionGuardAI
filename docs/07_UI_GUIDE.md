@@ -17,22 +17,22 @@ The UI was built in an AI studio and uses Tailwind CSS. **Do not modify the fron
 - New Claim Scoring → `/scoring`
 
 ### System Status (Bottom of Sidebar)
-- "Model AI: ONLINE" → driven by `GET /api/system/status` → `data.modelAi`
+- "Model AI: ONLINE" → driven by `GET /visionguard/api/system/status` → `data.modelAi`
 - "Pipeline: SYNCED" → `data.pipeline`
 
 ### Bell Icon (Notifications)
-- Badge count → `GET /api/notifications` → `data.unreadCount`
+- Badge count → `GET /visionguard/api/notifications` → `data.unreadCount`
 - On click → list from `data.items`
 
 ### Header Search
-- Calls `GET /api/search?query={value}` on input change (debounced 300ms)
+- Calls `GET /visionguard/api/search?query={value}` on input change (debounced 300ms)
 
 ---
 
 ## Screen 1 — Executive Dashboard
 
 **Route:** `/`
-**API:** `GET /api/dashboard/overview`
+**API:** `GET /visionguard/api/dashboard/overview`
 
 ### KPI Cards (Top Row)
 | UI Label | JSON path |
@@ -61,17 +61,17 @@ The UI was built in an AI studio and uses Tailwind CSS. **Do not modify the fron
 
 ### Buttons
 - "New Claim Scoring" → navigates to `/scoring`
-- "Export Report" → calls `POST /api/dashboard/export` → show toast "Export queued"
+- "Export Report" → calls `POST /visionguard/api/dashboard/export` → show toast "Export queued"
 
 ---
 
 ## Screen 2 — Historical Claims Explorer
 
 **Route:** `/claims`
-**API:** `GET /api/claims` (with query params)
+**API:** `GET /visionguard/api/claims` (with query params)
 
 ### Search Bar
-- Calls `GET /api/claims?search={value}` on Enter or debounced
+- Calls `GET /visionguard/api/claims?search={value}` on Enter or debounced
 
 ### Filter Buttons
 - "All Risks" dropdown → `riskLevel` param
@@ -108,7 +108,7 @@ Low (0-39):        gray or teal bg
 ## Screen 3 — Claim Investigation View
 
 **Route:** `/claims/:claimId`
-**API:** `GET /api/claims/:claimId`
+**API:** `GET /visionguard/api/claims/:claimId`
 
 ### Pipeline Stage Cards (Collapsible)
 The screen shows 5 expandable stages. Each maps to an analysis sub-object:
@@ -149,20 +149,20 @@ The screen shows 5 expandable stages. Each maps to an analysis sub-object:
 - "DETECTED FRAUD PATTERN": `data.claim.fraudType`
 
 ### Action Buttons
-- "Assign to SIU Analyst" → `POST /api/claims/:claimId/flag-siu`
-- "Download Report" → `GET /api/claims/:claimId/report` → open `data.downloadUrl`
+- "Assign to SIU Analyst" → `POST /visionguard/api/claims/:claimId/flag-siu`
+- "Download Report" → `GET /visionguard/api/claims/:claimId/report` → open `data.downloadUrl`
 
 ---
 
 ## Screen 4 — Provider Intelligence
 
 **Route:** `/providers`
-**API:** `GET /api/providers` (list) + `GET /api/providers/:providerId` (detail)
+**API:** `GET /visionguard/api/providers` (list) + `GET /visionguard/api/providers/:providerId` (detail)
 
 ### Monitored Entities List (Left Panel)
 - Each item: Provider name | ID | Location | Specialty | Risk Score badge
 - Click → loads provider detail in right panel
-- Search: `GET /api/providers?search={value}`
+- Search: `GET /visionguard/api/providers?search={value}`
 - Data: `data.items[]`
 
 ### Provider Detail (Right Panel)
@@ -192,16 +192,16 @@ The screen shows 5 expandable stages. Each maps to an analysis sub-object:
 ## Screen 5 — New Claim Scoring
 
 **Route:** `/scoring`
-**API:** POST/GET chain on `/api/scoring/jobs`
+**API:** POST/GET chain on `/visionguard/api/scoring/jobs`
 
 ### Submission
 - "Score New Claim" button → opens modal/form
 - Form fields map to `ClaimInput` schema (see API Contracts)
 - File upload option: `multipart/form-data` with `file` field
-- On submit: `POST /api/scoring/jobs` → store `jobId`
+- On submit: `POST /visionguard/api/scoring/jobs` → store `jobId`
 
 ### Pipeline Progress (After Submission)
-- Poll `GET /api/scoring/jobs/:jobId` every 1.5 seconds
+- Poll `GET /visionguard/api/scoring/jobs/:jobId` every 1.5 seconds
 - Progress bar driven by `data.progressPercent`
 - Active stage text: `data.activeStage`
 - Each stage row updates `status`: pending → processing → completed
@@ -212,9 +212,9 @@ The screen shows 5 expandable stages. Each maps to an analysis sub-object:
 - `pending`: clock/gray
 
 ### Results Display (Same as Claim Investigation View)
-- Once `status === "completed"`, call `GET /api/scoring/jobs/:jobId/result`
+- Once `status === "completed"`, call `GET /visionguard/api/scoring/jobs/:jobId/result`
 - Render exactly the same 5-stage + gauge layout as Screen 3
-- "Assign to SIU Analyst" → `POST /api/scoring/jobs/:jobId/assign-siu`
+- "Assign to SIU Analyst" → `POST /visionguard/api/scoring/jobs/:jobId/assign-siu`
 
 ---
 

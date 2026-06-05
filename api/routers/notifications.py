@@ -8,7 +8,7 @@ from db.database import get_db
 from db.models import Notification
 
 
-router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+router = APIRouter(prefix="/visionguard/api/notifications", tags=["notifications"])
 
 
 @router.get("")

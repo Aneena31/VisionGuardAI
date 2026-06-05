@@ -10,7 +10,7 @@ from api.services import claim_service
 from db.database import get_db
 
 
-router = APIRouter(prefix="/api/claims", tags=["claims"])
+router = APIRouter(prefix="/visionguard/api/claims", tags=["claims"])
 
 
 @router.get("")
