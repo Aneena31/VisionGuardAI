@@ -11,7 +11,7 @@ from db.database import get_db
 from typing import Optional
 
 
-router = APIRouter(prefix="/visionguard/api/providers", tags=["providers"])
+router = APIRouter(prefix="/visionguard/providers", tags=["providers"])
 
 
 @router.get("")

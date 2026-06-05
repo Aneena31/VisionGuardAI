@@ -9,7 +9,7 @@ from db.database import get_db
 from db.models import Claim, ProviderGold
 
 
-router = APIRouter(prefix="/visionguard/api/search", tags=["search"])
+router = APIRouter(prefix="/visionguard/search", tags=["search"])
 
 
 @router.get("")

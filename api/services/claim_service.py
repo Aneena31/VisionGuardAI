@@ -140,7 +140,7 @@ def report_payload(claim_id: str) -> dict:
     return {
         "claimId": claim_id,
         "reportId": f"RPT-{claim_id}",
-        "downloadUrl": f"/visionguard/api/claims/{claim_id}/report/download",
+        "downloadUrl": f"/visionguard/claims/{claim_id}/report/download",
         "expiresAt": expires.isoformat().replace("+00:00", "Z"),
     }
 

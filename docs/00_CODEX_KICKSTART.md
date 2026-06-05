@@ -222,7 +222,7 @@ Key constraints:
 - Scoring job must update progress_percent + active_stage at each pipeline step
 - Final result stored as JSON blob in scoring_jobs.result_json
 - Claim ID for new claims: "TEMP-{YYYYMMDD}-{uuid4()[:8].upper()}"
-- Same ClaimAnalysis response contract as GET /visionguard/api/claims/:claimId
+- Same ClaimAnalysis response contract as GET /visionguard/claims/:claimId
 
 Reference: docs/02_ARCHITECTURE.md (Async Job Pattern section)
 Reference: docs/03_API_CONTRACTS.md (Section 5)

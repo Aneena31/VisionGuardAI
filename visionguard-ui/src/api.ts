@@ -1,4 +1,27 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const LOCAL_API_BASE_URL = 'http://localhost:8000';
+const PRODUCTION_API_BASE_URL = 'https://d2brdeqy144bwg.cloudfront.net/visionguard';
+
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? PRODUCTION_API_BASE_URL : LOCAL_API_BASE_URL);
+
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  let basePath = '';
+
+  try {
+    basePath = new URL(BASE_URL).pathname.replace(/\/+$/, '');
+  } catch {
+    basePath = '';
+  }
+
+  const pathForBase =
+    basePath && normalizedPath.startsWith(`${basePath}/`)
+      ? normalizedPath.slice(basePath.length)
+      : normalizedPath;
+
+  return `${BASE_URL.replace(/\/+$/, '')}${pathForBase}`;
+}
 
 type Envelope<T> = {
   data: T;
@@ -7,7 +30,7 @@ type Envelope<T> = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   });
@@ -19,18 +42,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  getDashboard: () => request<any>('/visionguard/api/dashboard/overview'),
-  exportDashboard: () => request<any>('/visionguard/api/dashboard/export', { method: 'POST', body: JSON.stringify({ format: 'pdf' }) }),
-  getClaims: (params = '') => request<any>(`/visionguard/api/claims${params}`),
-  getClaim: (id: string) => request<any>(`/visionguard/api/claims/${id}`),
-  flagClaim: (id: string) => request<any>(`/visionguard/api/claims/${id}/flag-siu`, { method: 'POST' }),
-  getProviders: (params = '') => request<any>(`/visionguard/api/providers${params}`),
-  getProvider: (id: string) => request<any>(`/visionguard/api/providers/${id}`),
-  getSystemStatus: () => request<any>('/visionguard/api/system/status'),
-  getNotifications: () => request<any>('/visionguard/api/notifications'),
-  markNotificationRead: (id: string) => request<any>(`/visionguard/api/notifications/${id}/read`, { method: 'POST' }),
-  createScoringJob: (payload: any) => request<any>('/visionguard/api/scoring/jobs', { method: 'POST', body: JSON.stringify(payload) }),
-  getScoringJob: (id: string) => request<any>(`/visionguard/api/scoring/jobs/${id}`),
-  getScoringResult: (id: string) => request<any>(`/visionguard/api/scoring/jobs/${id}/result`),
-  assignScoringJob: (id: string) => request<any>(`/visionguard/api/scoring/jobs/${id}/assign-siu`, { method: 'POST' }),
+  getDashboard: () => request<any>('/visionguard/dashboard/overview'),
+  exportDashboard: () => request<any>('/visionguard/dashboard/export', { method: 'POST', body: JSON.stringify({ format: 'pdf' }) }),
+  getClaims: (params = '') => request<any>(`/visionguard/claims${params}`),
+  getClaim: (id: string) => request<any>(`/visionguard/claims/${id}`),
+  flagClaim: (id: string) => request<any>(`/visionguard/claims/${id}/flag-siu`, { method: 'POST' }),
+  getProviders: (params = '') => request<any>(`/visionguard/providers${params}`),
+  getProvider: (id: string) => request<any>(`/visionguard/providers/${id}`),
+  getSystemStatus: () => request<any>('/visionguard/system/status'),
+  getNotifications: () => request<any>('/visionguard/notifications'),
+  markNotificationRead: (id: string) => request<any>(`/visionguard/notifications/${id}/read`, { method: 'POST' }),
+  createScoringJob: (payload: any) => request<any>('/visionguard/scoring/jobs', { method: 'POST', body: JSON.stringify(payload) }),
+  getScoringJob: (id: string) => request<any>(`/visionguard/scoring/jobs/${id}`),
+  getScoringResult: (id: string) => request<any>(`/visionguard/scoring/jobs/${id}/result`),
+  assignScoringJob: (id: string) => request<any>(`/visionguard/scoring/jobs/${id}/assign-siu`, { method: 'POST' }),
 };

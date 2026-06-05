@@ -35,7 +35,7 @@ SourceType:       x12_837 | csv | json | manual
 
 ## 1. Executive Dashboard
 
-### `GET /visionguard/api/dashboard/overview`
+### `GET /visionguard/dashboard/overview`
 
 Returns KPIs, fraud trend, risk distribution, top suspicious providers.
 
@@ -82,7 +82,7 @@ Returns KPIs, fraud trend, risk distribution, top suspicious providers.
 
 ---
 
-### `POST /visionguard/api/dashboard/export`
+### `POST /visionguard/dashboard/export`
 
 Triggers PDF export of dashboard. Returns a job ID (async).
 
@@ -101,7 +101,7 @@ Triggers PDF export of dashboard. Returns a job ID (async).
 
 ## 2. Historical Claims Explorer
 
-### `GET /visionguard/api/claims`
+### `GET /visionguard/claims`
 
 Paginated, filterable list of all scored claims.
 
@@ -166,7 +166,7 @@ Paginated, filterable list of all scored claims.
 
 ## 3. Claim Investigation View
 
-### `GET /visionguard/api/claims/:claimId`
+### `GET /visionguard/claims/:claimId`
 
 Full detail for a single claim including analysis breakdown.
 
@@ -268,7 +268,7 @@ Full detail for a single claim including analysis breakdown.
 
 ---
 
-### `POST /visionguard/api/claims/:claimId/flag-siu`
+### `POST /visionguard/claims/:claimId/flag-siu`
 
 Flags a claim for SIU review. Updates status in DB.
 
@@ -288,7 +288,7 @@ Flags a claim for SIU review. Updates status in DB.
 
 ---
 
-### `GET /visionguard/api/claims/:claimId/report`
+### `GET /visionguard/claims/:claimId/report`
 
 Returns a download URL for the claim investigation report PDF.
 
@@ -298,7 +298,7 @@ Returns a download URL for the claim investigation report PDF.
   "data": {
     "claimId": "CLM-3310928",
     "reportId": "rpt_001",
-    "downloadUrl": "/visionguard/api/claims/CLM-3310928/report/download",
+    "downloadUrl": "/visionguard/claims/CLM-3310928/report/download",
     "expiresAt": "2026-06-04T10:34:00Z"
   },
   "meta": { "requestId": "req_report_001", "generatedAt": "2026-06-04T09:34:10Z" },
@@ -310,7 +310,7 @@ Returns a download URL for the claim investigation report PDF.
 
 ## 4. Provider Intelligence
 
-### `GET /visionguard/api/providers`
+### `GET /visionguard/providers`
 
 Paginated list of providers with risk metrics.
 
@@ -342,7 +342,7 @@ Paginated list of providers with risk metrics.
 
 ---
 
-### `GET /visionguard/api/providers/:providerId`
+### `GET /visionguard/providers/:providerId`
 
 Full provider detail with peer comparison and AI summary.
 
@@ -382,7 +382,7 @@ Full provider detail with peer comparison and AI summary.
 
 ## 5. New Claim Scoring
 
-### `POST /visionguard/api/scoring/jobs`
+### `POST /visionguard/scoring/jobs`
 
 Submit a new claim for scoring. Accepts multipart file upload OR JSON body.
 
@@ -425,7 +425,7 @@ Submit a new claim for scoring. Accepts multipart file upload OR JSON body.
 
 ---
 
-### `GET /visionguard/api/scoring/jobs/:jobId`
+### `GET /visionguard/scoring/jobs/:jobId`
 
 Poll for job status and pipeline progress.
 
@@ -453,9 +453,9 @@ Poll for job status and pipeline progress.
 
 ---
 
-### `GET /visionguard/api/scoring/jobs/:jobId/result`
+### `GET /visionguard/scoring/jobs/:jobId/result`
 
-Fetch full ClaimAnalysis once job is completed. Uses the **same contract** as `GET /visionguard/api/claims/:claimId`.
+Fetch full ClaimAnalysis once job is completed. Uses the **same contract** as `GET /visionguard/claims/:claimId`.
 
 ```json
 {
@@ -497,7 +497,7 @@ Fetch full ClaimAnalysis once job is completed. Uses the **same contract** as `G
 
 ---
 
-### `POST /visionguard/api/scoring/jobs/:jobId/assign-siu`
+### `POST /visionguard/scoring/jobs/:jobId/assign-siu`
 
 Assign a scored claim to the SIU queue.
 
@@ -519,7 +519,7 @@ Assign a scored claim to the SIU queue.
 
 ## 6. Global Services
 
-### `GET /visionguard/api/search?query=<string>`
+### `GET /visionguard/search?query=<string>`
 
 Cross-entity search across claims and providers.
 
@@ -541,7 +541,7 @@ Cross-entity search across claims and providers.
 
 ---
 
-### `GET /visionguard/api/notifications`
+### `GET /visionguard/notifications`
 
 Bell icon notifications.
 
@@ -568,7 +568,7 @@ Bell icon notifications.
 
 ---
 
-### `GET /visionguard/api/system/status`
+### `GET /visionguard/system/status`
 
 Model AI and pipeline status for the sidebar.
 
