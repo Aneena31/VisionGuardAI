@@ -13,8 +13,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.routers import claims, dashboard, notifications, providers, scoring, search, system
 from api.schemas.common import make_error_response, make_response
-from db.database import SessionLocal, init_db
-from pipeline import config, ml, stats
+from db.database import init_db
+from pipeline import config, ingest, ml, stats
 
 
 load_dotenv()
@@ -54,11 +54,9 @@ def startup_event() -> None:
     else:
         app.state.artifacts = None
 
-    db = SessionLocal()
-    try:
-        app.state.population_stats = stats.get_population_stats(db)
-    finally:
-        db.close()
+    claims_df = ingest.load_and_clean(str(config.DEFAULT_DATA_FILE_PATH))
+    claims_df = stats.apply_statistical_outliers(claims_df)
+    app.state.population_stats = stats.get_population_stats_from_frame(claims_df)
 
 
 app.include_router(dashboard.router)

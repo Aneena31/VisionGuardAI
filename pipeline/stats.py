@@ -136,41 +136,58 @@ def get_population_stats(db: Session) -> dict:
     df = pd.DataFrame(
         rows,
         columns=[
-            "provider_id",
-            "amt_allowed",
-            "units",
-            "billed_ratio",
-            "claim_stat_score",
-            "provider_stat_score",
-            "z_allowed",
-            "z_units",
-            "z_ratio",
+            "ProviderId",
+            "AmtAllowed",
+            "Units",
+            "BilledAmountToAllowedRatio",
+            "Claim_Stat_Score",
+            "Provider_Stat_Score",
+            "Z_AllowedAmount",
+            "Z_Units",
+            "Z_BilledToAllowed",
         ],
     ).fillna(0)
+    return get_population_stats_from_frame(df)
+
+
+def get_population_stats_from_frame(df: pd.DataFrame) -> dict:
+    """Build single-claim scoring context from processed historical Excel claims."""
+    if df.empty:
+        return {}
+
+    df = df.fillna(0)
     claim_raw = (
-        df["z_allowed"].abs() * 30 + df["z_units"].abs() * 20 + df["z_ratio"].abs() * 50
+        df["Z_AllowedAmount"].abs() * 30 + df["Z_Units"].abs() * 20 + df["Z_BilledToAllowed"].abs() * 50
     )
-    provider_group = df.groupby("provider_id", dropna=False).agg(
-        z_allowed=("z_allowed", "mean"),
-        z_units=("z_units", "mean"),
-        z_ratio=("z_ratio", "mean"),
-        score=("provider_stat_score", "mean"),
+    provider_group = df.groupby("ProviderId", dropna=False).agg(
+        z_allowed=("Z_Prov_Allowed", "mean") if "Z_Prov_Allowed" in df.columns else ("Z_AllowedAmount", "mean"),
+        z_units=("Z_Prov_Units", "mean") if "Z_Prov_Units" in df.columns else ("Z_Units", "mean"),
+        z_ratio=("Z_Prov_Ratio", "mean") if "Z_Prov_Ratio" in df.columns else ("Z_BilledToAllowed", "mean"),
+        score=("Provider_Stat_Score", "mean"),
     )
     provider_raw = (
         provider_group["z_allowed"].abs() * 40
         + provider_group["z_units"].abs() * 20
         + provider_group["z_ratio"].abs() * 40
     )
+    provider_stats = provider_group.to_dict(orient="index")
+    try:
+        from pipeline.aggregation import format_provider_id
+
+        provider_stats.update({format_provider_id(provider_id): values for provider_id, values in provider_stats.items()})
+    except Exception:
+        pass
+
     return {
-        "amt_allowed_mean": float(df["amt_allowed"].mean()),
-        "amt_allowed_std": float(df["amt_allowed"].std() or 0),
-        "units_mean": float(df["units"].mean()),
-        "units_std": float(df["units"].std() or 0),
-        "billed_ratio_mean": float(df["billed_ratio"].mean()),
-        "billed_ratio_std": float(df["billed_ratio"].std() or 0),
+        "amt_allowed_mean": float(df["AmtAllowed"].mean()),
+        "amt_allowed_std": float(df["AmtAllowed"].std() or 0),
+        "units_mean": float(df["Units"].mean()),
+        "units_std": float(df["Units"].std() or 0),
+        "billed_ratio_mean": float(df["BilledAmountToAllowedRatio"].mean()),
+        "billed_ratio_std": float(df["BilledAmountToAllowedRatio"].std() or 0),
         "claim_stat_raw_max": float(claim_raw.max() or 100),
         "provider_stat_raw_max": float(provider_raw.max() or 100),
-        "provider_stats": provider_group.to_dict(orient="index"),
+        "provider_stats": provider_stats,
     }
 
 
@@ -197,4 +214,3 @@ def _stat_narrative(row: pd.Series) -> str:
     if abs(float(row.get("Z_Prov_Allowed", 0) or 0)) >= config.NARRATIVE_ZSCORE_THRESHOLD:
         signals.append(f"Provider allowed amount behavior is {row.get('Z_Prov_Allowed', 0):.1f} SD from peers.")
     return " ".join(signals) if signals else "Claim and provider statistics are within expected ranges."
-

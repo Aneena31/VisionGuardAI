@@ -11,8 +11,8 @@ export default function HistoricalClaimsExplorer() {
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('All');
   const [claims, setClaims] = useState(mockClaims);
-  const [syncRun, setSyncRun] = useState<any>(null);
-  const [syncMessage, setSyncMessage] = useState('');
+  const [retrainRun, setRetrainRun] = useState<any>(null);
+  const [retrainMessage, setRetrainMessage] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams({ pageSize: '100' });
@@ -24,42 +24,42 @@ export default function HistoricalClaimsExplorer() {
   }, [searchTerm, riskFilter]);
 
   useEffect(() => {
-    api.getLatestSyncRetrain()
-      .then((data) => setSyncRun(data.run))
+    api.getLatestClaimsRetrain()
+      .then((data) => setRetrainRun(data.run))
       .catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    if (!syncRun || !['queued', 'running'].includes(syncRun.status)) return;
+    if (!retrainRun || !['queued', 'running'].includes(retrainRun.status)) return;
 
     const timer = window.setInterval(() => {
-      api.getLatestSyncRetrain()
+      api.getLatestClaimsRetrain()
         .then((data) => {
-          setSyncRun(data.run);
+          setRetrainRun(data.run);
           if (data.run?.status === 'completed') {
-            setSyncMessage(`Sync complete: ${data.run.claimsProcessed.toLocaleString()} historical claims loaded.`);
+            setRetrainMessage(`Retrain complete: ${data.run.claimsProcessed.toLocaleString()} workbook claims processed.`);
             api.getClaims('?pageSize=100').then((claimsData) => setClaims(claimsData.items)).catch(() => undefined);
           }
           if (data.run?.status === 'failed') {
-            setSyncMessage(data.run.errorMessage || 'Claim sync failed. Check the API logs for details.');
+            setRetrainMessage(data.run.errorMessage || 'Model retrain failed. Check the API logs for details.');
           }
         })
         .catch(() => undefined);
     }, 3000);
 
     return () => window.clearInterval(timer);
-  }, [syncRun?.id, syncRun?.status]);
+  }, [retrainRun?.id, retrainRun?.status]);
 
-  const isSyncing = !!syncRun && ['queued', 'running'].includes(syncRun.status);
+  const isRetraining = !!retrainRun && ['queued', 'running'].includes(retrainRun.status);
 
-  const handleSyncRetrain = async () => {
-    setSyncMessage('');
+  const handleRetrain = async () => {
+    setRetrainMessage('');
     try {
-      const data = await api.syncRetrainClaims();
-      setSyncRun(data.run);
-      setSyncMessage(data.message);
+      const data = await api.retrainClaimsModel();
+      setRetrainRun(data.run);
+      setRetrainMessage(data.message);
     } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : 'Unable to start claim sync.');
+      setRetrainMessage(error instanceof Error ? error.message : 'Unable to start model retrain.');
     }
   };
 
@@ -88,16 +88,16 @@ export default function HistoricalClaimsExplorer() {
         <div className="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto">
           <button
             type="button"
-            onClick={handleSyncRetrain}
-            disabled={isSyncing}
+            onClick={handleRetrain}
+            disabled={isRetraining}
             className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400 text-slate-950 rounded-lg py-2 px-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
           >
-            {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-            {isSyncing ? 'Syncing Claims' : 'Sync Claims'}
+            {isRetraining ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+            {isRetraining ? 'Retraining' : 'Retrain'}
           </button>
-          {(syncMessage || syncRun) && (
+          {(retrainMessage || retrainRun) && (
             <div className="text-xs text-slate-400 text-left sm:text-right max-w-[360px]">
-              {syncMessage || `Latest retrain: ${syncRun.status}`}
+              {retrainMessage || `Latest retrain: ${retrainRun.status}`}
             </div>
           )}
         </div>

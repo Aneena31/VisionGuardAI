@@ -52,8 +52,9 @@ def list_claims(
     return make_response(data, request.state.request_id)
 
 
+@router.post("/retrain")
 @router.post("/sync-retrain")
-def sync_and_retrain(background_tasks: BackgroundTasks, request: Request, db: Session = Depends(get_db)):
+def retrain(background_tasks: BackgroundTasks, request: Request, db: Session = Depends(get_db)):
     data = retraining_service.start_sync_retrain(request, db)
     task = data.pop("backgroundTask", None)
     if task:
@@ -61,8 +62,9 @@ def sync_and_retrain(background_tasks: BackgroundTasks, request: Request, db: Se
     return make_response(data, request.state.request_id)
 
 
+@router.get("/retrain/latest")
 @router.get("/sync-retrain/latest")
-def latest_sync_retrain(request: Request, db: Session = Depends(get_db)):
+def latest_retrain(request: Request, db: Session = Depends(get_db)):
     data = retraining_service.latest_sync_retrain(db)
     return make_response({"run": data}, request.state.request_id)
 

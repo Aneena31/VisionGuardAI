@@ -11,7 +11,7 @@ export default function NewClaimScoring() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState<Step>('upload');
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [activeAnalysis, setActiveAnalysis] = useState('Initializing Pipeline...');
+  const [activeAnalysis, setActiveAnalysis] = useState('Preparing claim review...');
   const [expandedStage, setExpandedStage] = useState<number>(0);
   const [jobId, setJobId] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -28,18 +28,32 @@ export default function NewClaimScoring() {
   const clusterAssignment = scoredAnalysis?.clusterAssignment;
   const fraudScore = Number(scoredClaim?.fraudScore || 0);
 
+  const concernLabel = (value: number) => {
+    const absolute = Math.abs(value);
+    if (absolute >= 2.5) return 'Very unusual';
+    if (absolute >= 1.5) return 'Somewhat unusual';
+    return 'Typical';
+  };
+
+  const scoreConcernLabel = (value: number) => {
+    if (value >= 75) return 'High concern';
+    if (value >= 50) return 'Needs review';
+    if (value >= 25) return 'Watch';
+    return 'Low concern';
+  };
+
   const beginProcessing = (jobPromise: Promise<any>) => {
     setStep('processing');
     setProcessingProgress(0);
-    setActiveAnalysis('Submitting Claim...');
+    setActiveAnalysis('Submitting claim for review...');
     setJobId(null);
     setResult(null);
     setUploadError(null);
     jobPromise
       .then((job) => setJobId(job.jobId))
       .catch((error) => {
-        setUploadError(error instanceof Error ? error.message : 'Scoring service unavailable.');
-        setActiveAnalysis('Scoring service unavailable.');
+        setUploadError(error instanceof Error ? error.message : 'Claim review is unavailable.');
+        setActiveAnalysis('Claim review is unavailable.');
         setStep('upload');
       });
   };
@@ -79,7 +93,7 @@ export default function NewClaimScoring() {
     const interval = setInterval(() => {
       api.getScoringJob(jobId).then((job) => {
         setProcessingProgress(job.progressPercent);
-        setActiveAnalysis(job.activeStage || 'Processing...');
+        setActiveAnalysis(job.activeStage || 'Reviewing claim...');
         if (job.status === 'completed') {
           clearInterval(interval);
           api.getScoringResult(jobId).then((data) => {
@@ -89,7 +103,7 @@ export default function NewClaimScoring() {
         }
         if (job.status === 'failed') {
           clearInterval(interval);
-          setActiveAnalysis('Pipeline failed.');
+          setActiveAnalysis('Claim review failed.');
         }
       }).catch(() => undefined);
     }, 1200);
@@ -105,12 +119,12 @@ export default function NewClaimScoring() {
     >
       <div className={`w-full ${step !== 'result' ? 'text-center xl:text-left xl:w-auto xl:mr-auto mb-4' : 'flex justify-between items-end'}`}>
         <div>
-          <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">New Claim Scoring</h2>
-          <p className="text-slate-400 text-sm">Automated SIU fraud inference pipeline.</p>
+          <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">New Claim Review</h2>
+          <p className="text-slate-400 text-sm">Review a new claim for payment risk and investigation priority.</p>
         </div>
         {step === 'result' && (
            <button onClick={() => setStep('upload')} className="bg-slate-800 border border-slate-700 text-slate-300 px-4 py-2 rounded text-xs font-bold hover:bg-slate-700 transition">
-             SCORE NEW CLAIM
+             REVIEW ANOTHER CLAIM
            </button>
         )}
       </div>
@@ -130,8 +144,8 @@ export default function NewClaimScoring() {
               <div className="w-20 h-20 bg-slate-900/60 border border-slate-700 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <UploadCloud className="w-10 h-10 text-cyan-400 group-hover:text-cyan-300" />
               </div>
-              <h3 className="text-xl font-medium text-white mb-2">Drag & Drop Claim Files</h3>
-              <p className="text-slate-400 text-sm mb-8 text-center max-w-sm">Support for X12 837, CSV, or direct JSON payloads.</p>
+              <h3 className="text-xl font-medium text-white mb-2">Upload Claim File</h3>
+              <p className="text-slate-400 text-sm mb-8 text-center max-w-sm">Upload a claim file or use a sample claim to see the review outcome.</p>
               {uploadError && (
                 <div className="mb-5 max-w-md rounded border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-200">
                   {uploadError}
@@ -159,7 +173,7 @@ export default function NewClaimScoring() {
                   onClick={startManualProcessing}
                   className="bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-bold text-xs px-6 py-3 rounded-md transition-colors flex items-center gap-2"
                 >
-                  <FileText className="w-4 h-4" /> MANUAL ENTRY
+                  <FileText className="w-4 h-4" /> USE SAMPLE CLAIM
                 </button>
               </div>
             </GlassCard>
@@ -181,7 +195,7 @@ export default function NewClaimScoring() {
                />
                <div className="relative z-10 flex flex-col items-center">
                  <Loader2 className="w-16 h-16 text-cyan-400 animate-spin mb-6" />
-                 <h3 className="text-xl font-medium text-white mb-2">Analyzing Target Claim...</h3>
+                 <h3 className="text-xl font-medium text-white mb-2">Reviewing Claim...</h3>
                  <div className="font-mono text-cyan-400 text-sm h-6">{activeAnalysis}</div>
                  
                  <div className="w-full max-w-md h-2 bg-slate-800 rounded-full mt-8 overflow-hidden">
@@ -192,7 +206,7 @@ export default function NewClaimScoring() {
                      transition={{ ease: "linear" }}
                    />
                  </div>
-                 <div className="text-slate-500 font-mono text-xs mt-2">{processingProgress}% Complete</div>
+                 <div className="text-slate-500 font-mono text-xs mt-2">{processingProgress}% Review Progress</div>
                </div>
             </GlassCard>
           </motion.div>
@@ -206,7 +220,7 @@ export default function NewClaimScoring() {
           >
             {/* Left Col: Timeline Workflow */}
             <div className="lg:col-span-8 flex flex-col gap-4">
-               {/* Step 1: Rules */}
+               {/* Step 1: Business checks */}
                <GlassCard className="p-0 overflow-hidden border-orange-500/30 ring-1 ring-orange-500/10">
                  <div className="px-6 py-4 flex items-center justify-between cursor-pointer bg-slate-900/60" onClick={() => setExpandedStage(0)}>
                    <div className="flex items-center gap-4">
@@ -214,8 +228,10 @@ export default function NewClaimScoring() {
                        <ShieldAlert className="w-4 h-4" />
                      </div>
                      <div>
-                       <h3 className="font-bold text-white text-sm">Rules Analysis Engine</h3>
-                       <p className="text-xs text-slate-400">Triggered {triggeredRules.length} deterministic rules</p>
+                       <h3 className="font-bold text-white text-sm">Billing Policy Checks</h3>
+                       <p className="text-xs text-slate-400">
+                         {triggeredRules.length > 0 ? `${triggeredRules.length} check${triggeredRules.length === 1 ? '' : 's'} need attention` : 'No policy issues found'}
+                       </p>
                      </div>
                    </div>
                    {expandedStage === 0 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -226,11 +242,11 @@ export default function NewClaimScoring() {
                        <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
                          <div className="grid grid-cols-2 gap-4 mb-4">
                            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Rule Score</div>
-                             <div className="text-2xl font-bold text-orange-500">{Math.round(scoredAnalysis?.rulesAnalysis?.ruleScore || 0)}</div>
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Billing Concern</div>
+                             <div className="text-2xl font-bold text-orange-500">{scoreConcernLabel(Number(scoredAnalysis?.rulesAnalysis?.ruleScore || 0))}</div>
                            </div>
                            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Severity Flags</div>
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Review Priority</div>
                              <div className="text-2xl font-bold text-white">{scoredAnalysis?.rulesAnalysis?.severity || 'Low'}</div>
                            </div>
                          </div>
@@ -243,7 +259,7 @@ export default function NewClaimScoring() {
                              ))
                            ) : (
                              <div className="p-3 bg-slate-900 border-l-2 border-slate-600 text-xs text-slate-300 rounded-r">
-                               No deterministic rules were triggered for this claim.
+                               No policy or billing checks raised concerns for this claim.
                              </div>
                            )}
                          </div>
@@ -253,7 +269,7 @@ export default function NewClaimScoring() {
                  </AnimatePresence>
                </GlassCard>
 
-               {/* Step 2: Statistical */}
+               {/* Step 2: Historical comparison */}
                <GlassCard className="p-0 overflow-hidden ring-1 ring-cyan-500/10">
                  <div className="px-6 py-4 flex items-center justify-between cursor-pointer bg-slate-900/60" onClick={() => setExpandedStage(1)}>
                    <div className="flex items-center gap-4">
@@ -261,8 +277,8 @@ export default function NewClaimScoring() {
                        <Activity className="w-4 h-4" />
                      </div>
                      <div>
-                       <h3 className="font-bold text-white text-sm">Statistical Analysis</h3>
-                       <p className="text-xs text-slate-400">Claim Z {claimZScore.toFixed(1)} | Provider Z {providerZScore.toFixed(1)}</p>
+                       <h3 className="font-bold text-white text-sm">Historical Comparison</h3>
+                       <p className="text-xs text-slate-400">Claim is {concernLabel(claimZScore).toLowerCase()} | Provider is {concernLabel(providerZScore).toLowerCase()}</p>
                      </div>
                    </div>
                    {expandedStage === 1 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -272,15 +288,15 @@ export default function NewClaimScoring() {
                      <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
                        <div className="p-6 border-t border-slate-800/50 bg-slate-900/40 grid grid-cols-2 gap-4">
                          <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
-                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Claim Z-Score</div>
-                         <div className="text-3xl font-display font-bold text-cyan-400">{claimZScore.toFixed(1)}</div>
+                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Claim Amount vs Similar Claims</div>
+                         <div className="text-3xl font-display font-bold text-cyan-400">{concernLabel(claimZScore)}</div>
                          </div>
                          <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
-                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Provider Z-Score</div>
-                         <div className="text-3xl font-display font-bold text-cyan-400">{providerZScore.toFixed(1)}</div>
+                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Provider Billing vs Peers</div>
+                         <div className="text-3xl font-display font-bold text-cyan-400">{concernLabel(providerZScore)}</div>
                          </div>
                          <div className="col-span-2 text-xs text-slate-400 leading-relaxed mt-2 p-3 bg-slate-900 rounded border border-slate-800">
-                           <strong className="text-white">Narrative:</strong> {scoredAnalysis?.statisticalAnalysis?.narrative || 'Claim and provider statistics are within expected ranges.'}
+                           <strong className="text-white">What this means:</strong> {scoredAnalysis?.statisticalAnalysis?.narrative || 'This claim and provider look typical compared with prior claims.'}
                          </div>
                        </div>
                      </motion.div>
@@ -288,7 +304,7 @@ export default function NewClaimScoring() {
                  </AnimatePresence>
                </GlassCard>
 
-               {/* Step 3: ML Outlier Detection */}
+               {/* Step 3: Pattern review */}
                <GlassCard className="p-0 overflow-hidden ring-1 ring-purple-500/10">
                  <div className="px-6 py-4 flex items-center justify-between cursor-pointer bg-slate-900/60" onClick={() => setExpandedStage(2)}>
                    <div className="flex items-center gap-4">
@@ -296,8 +312,8 @@ export default function NewClaimScoring() {
                        <BrainCircuit className="w-4 h-4" />
                      </div>
                      <div>
-                       <h3 className="font-bold text-white text-sm">ML Outlier Detection</h3>
-                       <p className="text-xs text-slate-400">IF {isolationForestScore.toFixed(1)} | PCA {pcaErrorScore.toFixed(1)} | ML {mlAnomalyScore.toFixed(1)}</p>
+                       <h3 className="font-bold text-white text-sm">Unusual Pattern Review</h3>
+                       <p className="text-xs text-slate-400">{scoreConcernLabel(mlAnomalyScore)} based on past claim behavior</p>
                      </div>
                    </div>
                    {expandedStage === 2 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -308,16 +324,16 @@ export default function NewClaimScoring() {
                        <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
                          <div className="grid grid-cols-2 gap-4 mb-4">
                            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Isolation Forest</div>
-                             <div className="text-lg font-bold text-purple-400">{isolationForestScore.toFixed(1)}</div>
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Payment Pattern</div>
+                             <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(isolationForestScore)}</div>
                            </div>
                            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">PCA Error Score</div>
-                             <div className="text-lg font-bold text-purple-400">{pcaErrorScore.toFixed(1)}</div>
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Claim Detail Pattern</div>
+                             <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(pcaErrorScore)}</div>
                            </div>
                          </div>
                          <div className="text-xs text-slate-400 leading-relaxed p-3 bg-slate-900 rounded border border-slate-800">
-                           <strong className="text-white">Model Summary:</strong> {scoredAnalysis?.mlAnalysis?.modelSummary || 'ML anomaly checks are within expected range.'}
+                           <strong className="text-white">Pattern Summary:</strong> {scoredAnalysis?.mlAnalysis?.modelSummary || 'The claim pattern is within the expected range.'}
                          </div>
                        </div>
                      </motion.div>
@@ -325,7 +341,7 @@ export default function NewClaimScoring() {
                  </AnimatePresence>
                </GlassCard>
 
-               {/* Step 4: Cluster Assignment */}
+               {/* Step 4: Similar case type */}
                <GlassCard className="p-0 overflow-hidden ring-1 ring-emerald-500/10">
                  <div className="px-6 py-4 flex items-center justify-between cursor-pointer bg-slate-900/60" onClick={() => setExpandedStage(3)}>
                    <div className="flex items-center gap-4">
@@ -333,8 +349,8 @@ export default function NewClaimScoring() {
                        <Users className="w-4 h-4" />
                      </div>
                      <div>
-                       <h3 className="font-bold text-white text-sm">Behavioral Cluster Assignment</h3>
-                       <p className="text-xs text-slate-400">{clusterAssignment?.matched ? `Mapped to Cluster ${clusterAssignment.clusterId}` : 'No fraud cluster assigned'}</p>
+                       <h3 className="font-bold text-white text-sm">Similar Case Type</h3>
+                       <p className="text-xs text-slate-400">{clusterAssignment?.matched ? 'Matches a known issue type' : 'No known issue type matched'}</p>
                      </div>
                    </div>
                    {expandedStage === 3 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -346,11 +362,11 @@ export default function NewClaimScoring() {
                          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                            <div className="flex justify-between items-center mb-2">
                              <span className="font-mono text-emerald-400 text-xs px-2 py-1 bg-emerald-500/20 rounded border border-emerald-500/30">{clusterAssignment?.clusterId || 'CL-00'}</span>
-                             <span className="text-xs text-slate-400">Computed from final fraud type</span>
+                             <span className="text-xs text-slate-400">Based on the likely issue type</span>
                            </div>
                            <h4 className="text-white font-medium text-sm mb-1">{clusterAssignment?.cluster?.name || 'N/A'}</h4>
                            <p className="text-xs text-emerald-100">
-                             {clusterAssignment?.cluster?.riskCharacteristics || 'No behavioral cluster assigned.'}
+                             {clusterAssignment?.cluster?.riskCharacteristics || 'No similar case type was found.'}
                            </p>
                          </div>
                        </div>
@@ -359,21 +375,21 @@ export default function NewClaimScoring() {
                  </AnimatePresence>
                </GlassCard>
 
-               {/* Step 5: AI Summary */}
+               {/* Step 5: Review summary */}
                <GlassCard className="p-6 bg-gradient-to-br from-slate-900/80 to-slate-800/50 border-cyan-500/30">
                  <div className="flex items-center justify-between mb-4">
                    <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                     <Zap className="w-4 h-4 text-cyan-400" /> AI Investigation Summary
+                     <Zap className="w-4 h-4 text-cyan-400" /> Review Summary
                    </h3>
                    <span className={`text-[10px] font-bold border px-2 py-1 rounded ${aiSummary?.llmGenerated ? 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10' : 'text-yellow-300 border-yellow-400/30 bg-yellow-400/10'}`}>
-                     {aiSummary?.llmGenerated ? `LLM ${aiSummary?.model || 'GENERATED'}` : 'FALLBACK SUMMARY'}
+                     {aiSummary?.llmGenerated ? 'GENERATED SUMMARY' : 'STANDARD SUMMARY'}
                    </span>
                  </div>
                  <div className="text-sm text-slate-300 space-y-4">
-                   <p>{aiSummary?.summary || 'No AI summary returned for this scoring job.'}</p>
+                   <p>{aiSummary?.summary || 'No review summary returned for this claim.'}</p>
                    <div className="p-3 bg-slate-900/50 border border-slate-700 rounded text-xs space-y-2">
-                     <div><strong className="text-cyan-400">Risk Reasoning:</strong> {aiSummary?.riskReasoning || 'No AI risk reasoning returned.'}</div>
-                     <div><strong className="text-cyan-400">Recommendation:</strong> {aiSummary?.recommendation || 'No AI recommendation returned.'}</div>
+                     <div><strong className="text-cyan-400">Why this matters:</strong> {aiSummary?.riskReasoning || 'No risk explanation returned.'}</div>
+                     <div><strong className="text-cyan-400">Recommendation:</strong> {aiSummary?.recommendation || 'No recommendation returned.'}</div>
                    </div>
                  </div>
                </GlassCard>
@@ -384,7 +400,7 @@ export default function NewClaimScoring() {
               <GlassCard className="flex flex-col items-center justify-center p-8 relative overflow-hidden h-80 ring-1 ring-red-500/20 bg-slate-900/90">
                  <div className="absolute w-64 h-64 rounded-full blur-[100px] opacity-20 pointer-events-none bg-red-500" />
                  
-                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute top-6 mt-1">FINAL OVERALL RISK</div>
+                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute top-6 mt-1">REVIEW PRIORITY</div>
                  
                  <div className="relative w-48 h-48 mt-6">
                     <ResponsiveContainer width="100%" height="100%">
@@ -402,13 +418,13 @@ export default function NewClaimScoring() {
                     </div>
                  </div>
                  <div className="text-center w-full mt-4 z-10">
-                   <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Detected Fraud Pattern</div>
-                   <div className="text-white text-sm font-bold">{scoredClaim?.fraudType || 'No Significant Fraud Indicators'}</div>
+                   <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Likely Issue</div>
+                   <div className="text-white text-sm font-bold">{scoredClaim?.fraudType || 'No Significant Concern Found'}</div>
                  </div>
               </GlassCard>
 
               <button onClick={() => jobId && api.assignScoringJob(jobId)} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs py-4 rounded-md transition-all shadow-[0_0_15px_rgba(8,145,178,0.3)]">
-                ASSIGN TO SIU ANALYST
+                SEND TO INVESTIGATION TEAM
               </button>
             </div>
 

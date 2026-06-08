@@ -13,12 +13,12 @@ from pipeline.pipeline import run_single
 
 
 STAGES = [
-    ("validate", "Validating Format...", 15),
-    ("rules", "Rule Engine Analysis...", 35),
-    ("statistics", "Statistical Profiling...", 55),
-    ("ml", "ML Outlier Detection...", 75),
-    ("cluster", "Assigning Behavioral Clusters...", 85),
-    ("summary", "Generating AI Summary...", 95),
+    ("validate", "Checking claim details...", 15),
+    ("rules", "Reviewing billing policy checks...", 35),
+    ("statistics", "Comparing with historical claims...", 55),
+    ("ml", "Looking for unusual payment patterns...", 75),
+    ("cluster", "Matching to known issue types...", 85),
+    ("summary", "Preparing review summary...", 95),
 ]
 
 
@@ -29,7 +29,7 @@ def create_job(db: Session, source_type: str, claim_input: dict) -> ScoringJob:
         status="queued",
         source_type=source_type,
         progress_percent=0,
-        active_stage="Queued",
+        active_stage="Queued for review",
         claim_input_json=json.dumps(claim_input),
         generated_claim_id=f"TEMP-{now:%Y%m%d}-{str(uuid4())[:8].upper()}",
     )
@@ -55,22 +55,22 @@ def run_pipeline_task(job_id: str, artifacts: dict, population_stats: dict) -> N
         job = db.get(ScoringJob, job_id)
         if not job:
             return
-        _update_job(db, job, "validating", 15, "Validating Format...")
+        _update_job(db, job, "validating", 15, "Checking claim details...")
         claim_input = json.loads(job.claim_input_json or "{}")
         claim_input["ClaimId"] = job.generated_claim_id
 
-        _update_job(db, job, "processing", 35, "Rule Engine Analysis...")
-        _update_job(db, job, "processing", 55, "Statistical Profiling...")
-        _update_job(db, job, "processing", 75, "ML Outlier Detection...")
+        _update_job(db, job, "processing", 35, "Reviewing billing policy checks...")
+        _update_job(db, job, "processing", 55, "Comparing with historical claims...")
+        _update_job(db, job, "processing", 75, "Looking for unusual payment patterns...")
         result = run_single(claim_input, artifacts, population_stats)
         result["ClaimId"] = job.generated_claim_id
 
-        _update_job(db, job, "processing", 85, "Assigning Behavioral Clusters...")
-        _update_job(db, job, "processing", 95, "Generating AI Summary...")
+        _update_job(db, job, "processing", 85, "Matching to known issue types...")
+        _update_job(db, job, "processing", 95, "Preparing review summary...")
         analysis = build_single_claim_analysis(result)
         job.status = "completed"
         job.progress_percent = 100
-        job.active_stage = "Scoring Complete"
+        job.active_stage = "Review complete"
         job.result_json = json.dumps(analysis)
         job.completed_at = datetime.utcnow()
         if result.get("Final_Risk_Level") == "Critical":
@@ -89,7 +89,7 @@ def run_pipeline_task(job_id: str, artifacts: dict, population_stats: dict) -> N
         if job:
             job.status = "failed"
             job.error_message = str(exc)
-            job.active_stage = "Pipeline failed"
+            job.active_stage = "Review failed"
             db.commit()
     finally:
         db.close()

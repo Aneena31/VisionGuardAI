@@ -5,10 +5,10 @@ from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any, Optional
 
-from sqlalchemy import asc, desc, or_
 from sqlalchemy.orm import Session
 
-from db.models import Claim, Notification, PipelineRun, ProviderGold
+from api.services import historical_data_service
+from db.models import Claim, Notification, ProviderGold
 
 
 CLUSTER_DEFINITIONS = {
@@ -58,34 +58,28 @@ def list_claims(
 ) -> dict:
     page = max(page, 1)
     page_size = min(max(page_size, 1), 100)
-    query = db.query(Claim)
+    claims = historical_data_service.get_historical_data().claims
+    filtered = [
+        claim
+        for claim in claims
+        if _matches_claim(
+            claim,
+            search=search,
+            risk_level=risk_level,
+            date_from=date_from,
+            date_to=date_to,
+            provider_id=provider_id,
+            procedure_code=procedure_code,
+            fraud_type=fraud_type,
+            status=status,
+            min_fraud_score=min_fraud_score,
+            max_fraud_score=max_fraud_score,
+        )
+    ]
 
-    if search:
-        term = f"%{search}%"
-        query = query.filter(or_(Claim.id.ilike(term), Claim.provider_id.ilike(term), Claim.procedure_code.ilike(term)))
-    if risk_level:
-        query = query.filter(Claim.final_risk_level == risk_level)
-    if provider_id:
-        query = query.filter(Claim.provider_id == provider_id)
-    if procedure_code:
-        query = query.filter(Claim.procedure_code == procedure_code)
-    if fraud_type:
-        query = query.filter(Claim.final_fraud_type == fraud_type)
-    if status:
-        query = query.filter(Claim.status == status)
-    if min_fraud_score is not None:
-        query = query.filter(Claim.final_combined_score >= min_fraud_score)
-    if max_fraud_score is not None:
-        query = query.filter(Claim.final_combined_score <= max_fraud_score)
-    if date_from:
-        query = query.filter(Claim.service_date >= date_from)
-    if date_to:
-        query = query.filter(Claim.service_date <= date_to)
-
-    total = query.count()
-    sort_column = _claim_sort_column(sort_by)
-    query = query.order_by(desc(sort_column) if sort_dir != "asc" else asc(sort_column))
-    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    total = len(filtered)
+    filtered.sort(key=lambda claim: _claim_sort_value(claim, sort_by), reverse=sort_dir != "asc")
+    items = filtered[(page - 1) * page_size : page * page_size]
 
     return {
         "items": [claim_summary(item) for item in items],
@@ -104,19 +98,19 @@ def list_claims(
 
 
 def get_claim_analysis(db: Session, claim_id: str) -> Optional[dict]:
-    claim = db.get(Claim, claim_id)
+    data = historical_data_service.get_historical_data()
+    claim = data.claims_by_id.get(claim_id)
     if not claim:
         return None
-    provider = db.get(ProviderGold, claim.provider_id)
+    provider = data.providers_by_id.get(claim.provider_id)
     return build_claim_analysis(claim, provider)
 
 
 def flag_claim(db: Session, claim_id: str) -> Optional[dict]:
-    claim = db.get(Claim, claim_id)
+    claim = historical_data_service.get_historical_data().claims_by_id.get(claim_id)
     if not claim:
         return None
-    claim.status = "Investigating"
-    claim.flagged_at = datetime.utcnow()
+    flagged_at = datetime.utcnow()
     notification = Notification(
         id=_notification_id(),
         type="claim_flagged",
@@ -129,9 +123,9 @@ def flag_claim(db: Session, claim_id: str) -> Optional[dict]:
     db.commit()
     return {
         "claimId": claim_id,
-        "status": claim.status,
+        "status": "Investigating",
         "queue": "SIU",
-        "flaggedAt": claim.flagged_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"),
+        "flaggedAt": flagged_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"),
     }
 
 
@@ -306,13 +300,55 @@ def _json_or_default(raw: Optional[str], default: Any) -> Any:
         return default
 
 
-def _claim_sort_column(sort_by: str):
-    return {
-        "fraudScore": Claim.final_combined_score,
-        "allowedAmount": Claim.amt_allowed,
-        "date": Claim.service_date,
-        "riskLevel": Claim.final_risk_level,
-    }.get(sort_by, Claim.final_combined_score)
+def _matches_claim(
+    claim: Claim,
+    search: Optional[str],
+    risk_level: Optional[str],
+    date_from: Optional[str],
+    date_to: Optional[str],
+    provider_id: Optional[str],
+    procedure_code: Optional[str],
+    fraud_type: Optional[str],
+    status: Optional[str],
+    min_fraud_score: Optional[float],
+    max_fraud_score: Optional[float],
+) -> bool:
+    if search:
+        term = search.lower()
+        haystack = " ".join([claim.id or "", claim.provider_id or "", claim.provider_name or "", claim.procedure_code or ""]).lower()
+        if term not in haystack:
+            return False
+    if risk_level and claim.final_risk_level != risk_level:
+        return False
+    if provider_id and claim.provider_id != provider_id:
+        return False
+    if procedure_code and claim.procedure_code != procedure_code:
+        return False
+    if fraud_type and claim.final_fraud_type != fraud_type:
+        return False
+    if status and (claim.status or "Pending") != status:
+        return False
+    if min_fraud_score is not None and (claim.final_combined_score or 0) < min_fraud_score:
+        return False
+    if max_fraud_score is not None and (claim.final_combined_score or 0) > max_fraud_score:
+        return False
+    if (date_from or date_to) and not claim.service_date:
+        return False
+    if date_from and claim.service_date.isoformat() < date_from:
+        return False
+    if date_to and claim.service_date.isoformat() > date_to:
+        return False
+    return True
+
+
+def _claim_sort_value(claim: Claim, sort_by: str):
+    if sort_by == "allowedAmount":
+        return claim.amt_allowed or 0
+    if sort_by == "date":
+        return claim.service_date or datetime.min.date()
+    if sort_by == "riskLevel":
+        return {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}.get(claim.final_risk_level or "Low", 0)
+    return claim.final_combined_score or 0
 
 
 def _notification_id() -> str:
