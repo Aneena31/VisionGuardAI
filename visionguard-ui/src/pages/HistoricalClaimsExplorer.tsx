@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { GlassCard, RiskBadge } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { claims as mockClaims } from '../data';
-import { Search, Filter, CalendarDays, SlidersHorizontal, ChevronRight } from 'lucide-react';
+import { Search, CalendarDays, SlidersHorizontal, ChevronRight, RefreshCw, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
@@ -11,6 +11,8 @@ export default function HistoricalClaimsExplorer() {
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('All');
   const [claims, setClaims] = useState(mockClaims);
+  const [syncRun, setSyncRun] = useState<any>(null);
+  const [syncMessage, setSyncMessage] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams({ pageSize: '100' });
@@ -20,6 +22,46 @@ export default function HistoricalClaimsExplorer() {
       .then((data) => setClaims(data.items))
       .catch(() => setClaims(mockClaims));
   }, [searchTerm, riskFilter]);
+
+  useEffect(() => {
+    api.getLatestSyncRetrain()
+      .then((data) => setSyncRun(data.run))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!syncRun || !['queued', 'running'].includes(syncRun.status)) return;
+
+    const timer = window.setInterval(() => {
+      api.getLatestSyncRetrain()
+        .then((data) => {
+          setSyncRun(data.run);
+          if (data.run?.status === 'completed') {
+            setSyncMessage(`Retrain complete: ${data.run.claimsProcessed.toLocaleString()} historical claims synced.`);
+            api.getClaims('?pageSize=100').then((claimsData) => setClaims(claimsData.items)).catch(() => undefined);
+          }
+          if (data.run?.status === 'failed') {
+            setSyncMessage(data.run.errorMessage || 'Retrain failed. Check the API logs for details.');
+          }
+        })
+        .catch(() => undefined);
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [syncRun?.id, syncRun?.status]);
+
+  const isSyncing = !!syncRun && ['queued', 'running'].includes(syncRun.status);
+
+  const handleSyncRetrain = async () => {
+    setSyncMessage('');
+    try {
+      const data = await api.syncRetrainClaims();
+      setSyncRun(data.run);
+      setSyncMessage(data.message);
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : 'Unable to start retrain.');
+    }
+  };
 
   const filteredClaims = claims.filter(c => {
     const matchesSearch = 
@@ -38,10 +80,26 @@ export default function HistoricalClaimsExplorer() {
       transition={{ duration: 0.3 }}
       className="space-y-6 h-full flex flex-col"
     >
-      <div className="flex justify-between items-end shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">Historical Claims Explorer</h2>
           <p className="text-slate-400 text-sm">Deep-dive into verified historical anomalies and flagged activity.</p>
+        </div>
+        <div className="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={handleSyncRetrain}
+            disabled={isSyncing}
+            className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400 text-slate-950 rounded-lg py-2 px-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
+          >
+            {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+            {isSyncing ? 'Syncing & Retraining' : 'Sync & Retrain ML'}
+          </button>
+          {(syncMessage || syncRun) && (
+            <div className="text-xs text-slate-400 text-left sm:text-right max-w-[360px]">
+              {syncMessage || `Latest retrain: ${syncRun.status}`}
+            </div>
+          )}
         </div>
       </div>
 

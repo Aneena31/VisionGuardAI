@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from api.schemas.common import make_response
-from api.services import claim_service
+from api.services import claim_service, retraining_service
 from db.database import get_db
 
 
@@ -50,6 +50,21 @@ def list_claims(
         sort_dir=sortDir,
     )
     return make_response(data, request.state.request_id)
+
+
+@router.post("/sync-retrain")
+def sync_and_retrain(background_tasks: BackgroundTasks, request: Request, db: Session = Depends(get_db)):
+    data = retraining_service.start_sync_retrain(request, db)
+    task = data.pop("backgroundTask", None)
+    if task:
+        background_tasks.add_task(task)
+    return make_response(data, request.state.request_id)
+
+
+@router.get("/sync-retrain/latest")
+def latest_sync_retrain(request: Request, db: Session = Depends(get_db)):
+    data = retraining_service.latest_sync_retrain(db)
+    return make_response({"run": data}, request.state.request_id)
 
 
 @router.get("/{claim_id}")

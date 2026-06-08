@@ -8,6 +8,8 @@ __pycache__/
 venv/
 .venv/
 
+data/
+
 
 artifacts/*.pkl
 artifacts/*.json
