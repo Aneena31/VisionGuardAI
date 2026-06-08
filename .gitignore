@@ -18,7 +18,4 @@ artifacts/*.pkl
 artifacts/*.json
 !artifacts/.gitkeep
 
-data/
-data/Sample_Data_for_ML.xlsx
-
 *.log

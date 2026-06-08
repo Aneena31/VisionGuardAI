@@ -31,7 +31,7 @@ app = FastAPI(title="VisionGuard AI API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     # allow_origins=[origin.strip() for origin in cors_origins.split(",") if origin.strip()],
-    allow_origins=["*"]
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
