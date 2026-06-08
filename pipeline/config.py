@@ -8,7 +8,6 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_FILE_PATH = BASE_DIR / "data" / "Sample_Data_for_ML.xlsx"
-DEFAULT_DATA_DIR_PATH = BASE_DIR / "data"
 DEFAULT_ARTIFACTS_PATH = BASE_DIR / "artifacts"
 
 # Rule thresholds

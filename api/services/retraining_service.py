@@ -72,7 +72,7 @@ def run_sync_retrain(db: Session, app: Any, run_id: str) -> None:
         run.status = "running"
         db.commit()
 
-        data_source = _data_source_path()
+        data_source = config.DEFAULT_DATA_FILE_PATH
         artifacts_path = Path(os.getenv("ARTIFACTS_PATH", str(config.DEFAULT_ARTIFACTS_PATH)))
         if not data_source.exists():
             raise FileNotFoundError(f"Claims data source not found: {data_source}")
@@ -137,16 +137,6 @@ def _is_run_active(db: Session) -> bool:
 
 def _latest_run(db: Session) -> PipelineRun | None:
     return db.query(PipelineRun).order_by(PipelineRun.started_at.desc()).first()
-
-
-def _data_source_path() -> Path:
-    configured_dir = os.getenv("DATA_DIR_PATH")
-    if configured_dir:
-        return Path(configured_dir)
-    configured_file = os.getenv("DATA_FILE_PATH")
-    if configured_file:
-        return Path(configured_file)
-    return config.DEFAULT_DATA_DIR_PATH
 
 
 def _run_payload(run: PipelineRun | None) -> dict[str, Any] | None:

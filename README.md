@@ -11,14 +11,11 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Place source claim files in the data folder:
+Place the source workbook at:
 
 ```text
-data/
+data/Sample_Data_for_ML.xlsx
 ```
-
-The sync button and seed script read every supported `.xlsx`, `.xls`, and `.csv` file in `DATA_DIR_PATH`.
-Set `DATA_FILE_PATH` instead if you want to sync one specific workbook.
 
 ## Seed The Database
 

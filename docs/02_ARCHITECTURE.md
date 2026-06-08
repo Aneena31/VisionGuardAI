@@ -207,9 +207,6 @@ async def create_scoring_job(claim: ClaimInput, background_tasks: BackgroundTask
 DATABASE_URL=sqlite:///./visionguard.db
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
-DATA_DIR_PATH=./data
-# Optional single-file mode:
-# DATA_FILE_PATH=./data/Sample_Data_for_ML.xlsx
 ARTIFACTS_PATH=./artifacts
 LOG_LEVEL=INFO
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
