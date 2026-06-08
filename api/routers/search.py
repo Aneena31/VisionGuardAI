@@ -1,32 +1,28 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Request
 
 from api.schemas.common import make_response
-from db.database import get_db
-from db.models import Claim, ProviderGold
+from api.services.historical_data_service import get_historical_data
 
 
 router = APIRouter(prefix="/visionguard/search", tags=["search"])
 
 
 @router.get("")
-def search(query: str, request: Request, db: Session = Depends(get_db)):
-    term = f"%{query}%"
-    claims = (
-        db.query(Claim)
-        .filter(or_(Claim.id.ilike(term), Claim.provider_id.ilike(term), Claim.procedure_code.ilike(term)))
-        .limit(5)
-        .all()
-    )
-    providers = (
-        db.query(ProviderGold)
-        .filter(or_(ProviderGold.id.ilike(term), ProviderGold.name.ilike(term)))
-        .limit(5)
-        .all()
-    )
+def search(query: str, request: Request):
+    data = get_historical_data()
+    term = query.lower()
+    claims = [
+        claim
+        for claim in data.claims
+        if term in " ".join([claim.id or "", claim.provider_id or "", claim.procedure_code or ""]).lower()
+    ][:5]
+    providers = [
+        provider
+        for provider in data.providers_by_id.values()
+        if term in " ".join([provider.id or "", provider.name or ""]).lower()
+    ][:5]
     return make_response(
         {
             "claims": [
@@ -40,4 +36,3 @@ def search(query: str, request: Request, db: Session = Depends(get_db)):
         },
         request.state.request_id,
     )
-

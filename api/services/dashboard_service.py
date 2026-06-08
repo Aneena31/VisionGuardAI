@@ -1,55 +1,35 @@
 from __future__ import annotations
 
 import time
+from collections import Counter, defaultdict
 
-from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from api.services.historical_data_service import get_historical_data
 from api.services.provider_service import provider_summary
-from db.models import Claim, ProviderGold
 
 
 def overview(db: Session) -> dict:
     t0 = time.perf_counter()
     print("[VisionGuard] dashboard overview started", flush=True)
 
-    total_claims = db.query(func.count(Claim.id)).scalar() or 0
-    total_allowed = db.query(func.coalesce(func.sum(Claim.amt_allowed), 0)).scalar() or 0
-    avg_score = db.query(func.coalesce(func.avg(Claim.final_combined_score), 0)).scalar() or 0
-    critical = db.query(func.count(Claim.id)).filter(Claim.final_risk_level == "Critical").scalar() or 0
-
-    trend_rows = (
-        db.query(
-            func.strftime("%Y-%m", Claim.service_date).label("period"),
-            func.count(Claim.id).label("claim_count"),
-            func.coalesce(
-                func.sum(
-                    case(
-                        (Claim.final_risk_level.in_(["High", "Critical"]), Claim.amt_allowed),
-                        else_=0,
-                    )
-                ),
-                0,
-            ).label("fraud_amount"),
-        )
-        .filter(Claim.service_date.isnot(None))
-        .group_by("period")
-        .order_by("period")
-        .all()
-    )
-    risk_rows = (
-        db.query(Claim.final_risk_level, func.count(Claim.id))
-        .group_by(Claim.final_risk_level)
-        .all()
-    )
-    risk_counts = {(level or "Low"): count for level, count in risk_rows}
-
-    top_providers = (
-        db.query(ProviderGold)
-        .order_by(ProviderGold.provider_risk_score.desc())
-        .limit(5)
-        .all()
-    )
+    data = get_historical_data()
+    claims = data.claims
+    providers = list(data.providers_by_id.values())
+    total_claims = len(claims)
+    total_allowed = sum(claim.amt_allowed or 0 for claim in claims)
+    avg_score = sum(claim.final_combined_score or 0 for claim in claims) / total_claims if total_claims else 0
+    critical = sum(1 for claim in claims if claim.final_risk_level == "Critical")
+    risk_counts = Counter(claim.final_risk_level or "Low" for claim in claims)
+    trend_counts: dict[str, dict[str, float]] = defaultdict(lambda: {"claim_count": 0, "fraud_amount": 0.0})
+    for claim in claims:
+        if not claim.service_date:
+            continue
+        period = claim.service_date.strftime("%Y-%m")
+        trend_counts[period]["claim_count"] += 1
+        if claim.final_risk_level in ["High", "Critical"]:
+            trend_counts[period]["fraud_amount"] += claim.amt_allowed or 0
+    top_providers = sorted(providers, key=lambda provider: provider.provider_risk_score or 0, reverse=True)[:5]
     payload = {
         "kpis": {
             "totalClaimsAnalyzed": {"value": total_claims, "trendPercent": 0.0, "trendDirection": "up"},
@@ -62,12 +42,12 @@ def overview(db: Session) -> dict:
         },
         "fraudTrend": [
             {
-                "period": row.period,
-                "label": _month_label(row.period),
-                "fraudAmount": float(row.fraud_amount or 0),
-                "claimCount": int(row.claim_count or 0),
+                "period": period,
+                "label": _month_label(period),
+                "fraudAmount": float(values["fraud_amount"] or 0),
+                "claimCount": int(values["claim_count"] or 0),
             }
-            for row in trend_rows
+            for period, values in sorted(trend_counts.items())
         ],
         "riskDistribution": {
             "totalAnalyzed": total_claims,

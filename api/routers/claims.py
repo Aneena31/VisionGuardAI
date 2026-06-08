@@ -27,9 +27,9 @@ def list_claims(
     minFraudScore: Optional[float] = None,
     maxFraudScore: Optional[float] = None,
     page: int = 1,
-    pageSize: int = Query(25, le=100),
-    sortBy: str = "fraudScore",
-    sortDir: str = "desc",
+    pageSize: int = Query(20, le=100),
+    sortBy: str = "rowId",
+    sortDir: str = "asc",
     db: Session = Depends(get_db),
 ):
     data = claim_service.list_claims(

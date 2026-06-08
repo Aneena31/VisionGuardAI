@@ -12,9 +12,20 @@ const RISK_COLORS = { 'Low': '#10b981', 'Medium': '#eab308', 'High': '#f97316', 
 export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api.getDashboard().then(setDashboard).catch(() => setDashboard(null));
+    setIsLoading(true);
+    setLoadError('');
+    api.getDashboard()
+      .then((data) => {
+        setDashboard(data);
+      })
+      .catch((error) => {
+        setLoadError(error instanceof Error ? error.message : 'Unable to load dashboard data.');
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const kpis = dashboard?.kpis;
@@ -36,6 +47,44 @@ export default function ExecutiveDashboard() {
   const exportReport = () => {
     api.exportDashboard().catch(() => undefined);
   };
+
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -15 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-6"
+      >
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">Executive Dashboard</h2>
+          <p className="text-slate-400 text-sm">Loading dashboard data...</p>
+        </div>
+        <GlassCard className="p-6 text-sm text-slate-300">Loading claims from Excel...</GlassCard>
+      </motion.div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -15 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-6"
+      >
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">Executive Dashboard</h2>
+          <p className="text-red-400 text-sm">{loadError}</p>
+        </div>
+        <GlassCard className="p-6 text-sm text-slate-300">
+          Dashboard data could not be loaded from the Excel source.
+        </GlassCard>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

@@ -15,8 +15,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from api.routers import claims, dashboard, notifications, providers, scoring, search, system
 from api.schemas.common import make_error_response, make_response
 from db.database import init_db
-from db.models import Claim, ProviderGold
-from db.database import SessionLocal
 from pipeline import config, ingest, ml, stats
 
 
@@ -71,17 +69,11 @@ def startup_event() -> None:
         f"duration={time.perf_counter() - step_t0:.3f}s",
         flush=True,
     )
-    db = SessionLocal()
-    try:
-        claim_count = db.query(Claim).count()
-        provider_count = db.query(ProviderGold).count()
-        print(
-            f"[VisionGuard] startup database ready claims={claim_count:,} providers={provider_count:,} "
-            f"totalDuration={time.perf_counter() - t0:.3f}s",
-            flush=True,
-        )
-    finally:
-        db.close()
+    print(
+        f"[VisionGuard] startup database ready for operational tables "
+        f"totalDuration={time.perf_counter() - t0:.3f}s",
+        flush=True,
+    )
 
 
 app.include_router(dashboard.router)

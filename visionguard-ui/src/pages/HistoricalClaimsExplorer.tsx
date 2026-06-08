@@ -29,6 +29,7 @@ const normalizeClaim = (claim: any): Claim => ({
 });
 
 const normalizeClaims = (items: any) => (Array.isArray(items) ? items.map(normalizeClaim) : []);
+const defaultPagination = { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 };
 const latestRetrain = () => {
   const client = api as any;
   const request = client.getLatestClaimsRetrain || client.getLatestSyncRetrain;
@@ -45,23 +46,27 @@ export default function HistoricalClaimsExplorer() {
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('All');
   const [claims, setClaims] = useState<Claim[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState(defaultPagination);
   const [retrainRun, setRetrainRun] = useState<any>(null);
   const [retrainMessage, setRetrainMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(pagination.page), pageSize: '20' });
     if (searchTerm) params.set('search', searchTerm);
     if (riskFilter !== 'All') params.set('riskLevel', riskFilter);
+    setIsLoading(true);
+    setLoadError('');
     api.getClaims(`?${params.toString()}`)
       .then((data) => {
         setClaims(normalizeClaims(data?.items));
-        setPagination(data?.pagination || { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
+        setPagination(data?.pagination || defaultPagination);
       })
-      .catch(() => {
-        setClaims([]);
-        setPagination({ page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
-      });
+      .catch((error) => {
+        setLoadError(error instanceof Error ? error.message : 'Unable to load historical claims.');
+      })
+      .finally(() => setIsLoading(false));
   }, [searchTerm, riskFilter, pagination.page]);
 
   useEffect(() => {
@@ -81,10 +86,13 @@ export default function HistoricalClaimsExplorer() {
             setRetrainMessage(`Retrain complete: ${data.run.claimsProcessed.toLocaleString()} workbook claims processed.`);
             api.getClaims('?page=1&pageSize=20')
               .then((claimsData) => {
+                setLoadError('');
                 setClaims(normalizeClaims(claimsData?.items));
-                setPagination(claimsData?.pagination || { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
+                setPagination(claimsData?.pagination || defaultPagination);
               })
-              .catch(() => undefined);
+              .catch((error) => {
+                setLoadError(error instanceof Error ? error.message : 'Unable to reload historical claims.');
+              });
           }
           if (data.run?.status === 'failed') {
             setRetrainMessage(data.run.errorMessage || 'Model retrain failed. Check the API logs for details.');
@@ -183,7 +191,7 @@ export default function HistoricalClaimsExplorer() {
       <GlassCard className="flex-1 overflow-hidden flex flex-col p-0">
         <div className="px-6 py-3 border-b border-slate-800 text-xs text-slate-400 flex items-center justify-between">
           <span>
-            Showing {visibleClaims.length} of {pagination.totalItems.toLocaleString()} claims
+            {isLoading ? 'Loading claims from Excel...' : `Showing ${visibleClaims.length} of ${pagination.totalItems.toLocaleString()} claims`}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -222,7 +230,7 @@ export default function HistoricalClaimsExplorer() {
              </thead>
              <tbody className="text-xs text-slate-300">
                <AnimatePresence>
-                 {visibleClaims.map((claim, idx) => (
+                 {!isLoading && !loadError && visibleClaims.map((claim, idx) => (
                    <motion.tr 
                      key={claim.id}
                      initial={{ opacity: 0, y: 10 }}
@@ -263,7 +271,19 @@ export default function HistoricalClaimsExplorer() {
                </AnimatePresence>
              </tbody>
           </table>
-          {visibleClaims.length === 0 && (
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+              <RefreshCw className="w-10 h-10 mb-4 animate-spin opacity-60" />
+              <p>Loading claims from Excel...</p>
+            </div>
+          )}
+          {!isLoading && loadError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-red-400">
+              <Search className="w-12 h-12 mb-4 opacity-20" />
+              <p>{loadError}</p>
+            </div>
+          )}
+          {!isLoading && !loadError && visibleClaims.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
               <Search className="w-12 h-12 mb-4 opacity-20" />
               <p>No claims found matching these criteria.</p>

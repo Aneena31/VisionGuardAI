@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any, Optional
 
-from sqlalchemy import asc, desc, or_
 from sqlalchemy.orm import Session
 
+from api.services.historical_data_service import get_historical_data
 from db.models import Claim, Notification, ProviderGold
 
 
@@ -53,9 +53,9 @@ def list_claims(
     min_fraud_score: Optional[float] = None,
     max_fraud_score: Optional[float] = None,
     page: int = 1,
-    page_size: int = 25,
-    sort_by: str = "fraudScore",
-    sort_dir: str = "desc",
+    page_size: int = 20,
+    sort_by: str = "rowId",
+    sort_dir: str = "asc",
 ) -> dict:
     t0 = time.perf_counter()
     page = max(page, 1)
@@ -66,40 +66,27 @@ def list_claims(
         flush=True,
     )
 
-    query = db.query(Claim)
-    if search:
-        term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Claim.id.ilike(term),
-                Claim.provider_id.ilike(term),
-                Claim.provider_name.ilike(term),
-                Claim.procedure_code.ilike(term),
-            )
+    claims = [
+        claim
+        for claim in get_historical_data().claims
+        if _matches_claim(
+            claim,
+            search,
+            risk_level,
+            date_from,
+            date_to,
+            provider_id,
+            procedure_code,
+            fraud_type,
+            status,
+            min_fraud_score,
+            max_fraud_score,
         )
-    if risk_level:
-        query = query.filter(Claim.final_risk_level == risk_level)
-    if provider_id:
-        query = query.filter(Claim.provider_id == provider_id)
-    if procedure_code:
-        query = query.filter(Claim.procedure_code == procedure_code)
-    if fraud_type:
-        query = query.filter(Claim.final_fraud_type == fraud_type)
-    if status:
-        query = query.filter(Claim.status == status)
-    if min_fraud_score is not None:
-        query = query.filter(Claim.final_combined_score >= min_fraud_score)
-    if max_fraud_score is not None:
-        query = query.filter(Claim.final_combined_score <= max_fraud_score)
-    if date_from:
-        query = query.filter(Claim.service_date >= date_from)
-    if date_to:
-        query = query.filter(Claim.service_date <= date_to)
+    ]
 
-    total = query.count()
-    sort_column = _claim_sort_column(sort_by)
-    query = query.order_by(asc(sort_column) if sort_dir == "asc" else desc(sort_column))
-    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    total = len(claims)
+    claims.sort(key=lambda claim: _claim_sort_value(claim, sort_by), reverse=sort_dir != "asc")
+    items = claims[(page - 1) * page_size : page * page_size]
     print(
         f"[VisionGuard] claims list completed returned={len(items)} total={total:,} "
         f"duration={time.perf_counter() - t0:.3f}s",
@@ -123,15 +110,18 @@ def list_claims(
 
 
 def get_claim_analysis(db: Session, claim_id: str) -> Optional[dict]:
-    claim = db.get(Claim, claim_id)
+    data = get_historical_data()
+    claim = data.claims_by_id.get(claim_id)
     if not claim:
         return None
-    provider = db.get(ProviderGold, claim.provider_id) if claim.provider_id else None
+    provider = data.providers_by_id.get(claim.provider_id) if claim.provider_id else None
     return build_claim_analysis(claim, provider)
 
 
 def flag_claim(db: Session, claim_id: str) -> Optional[dict]:
     claim = db.get(Claim, claim_id)
+    if not claim:
+        claim = get_historical_data().claims_by_id.get(claim_id)
     if not claim:
         return None
     flagged_at = datetime.utcnow()
@@ -368,22 +358,17 @@ def _matches_claim(
 
 
 def _claim_sort_value(claim: Claim, sort_by: str):
+    if sort_by == "rowId":
+        return claim.row_id or 0
     if sort_by == "allowedAmount":
         return claim.amt_allowed or 0
     if sort_by == "date":
         return claim.service_date or datetime.min.date()
     if sort_by == "riskLevel":
         return {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}.get(claim.final_risk_level or "Low", 0)
+    if sort_by == "claimId":
+        return claim.id or ""
     return claim.final_combined_score or 0
-
-
-def _claim_sort_column(sort_by: str):
-    return {
-        "allowedAmount": Claim.amt_allowed,
-        "date": Claim.service_date,
-        "riskLevel": Claim.final_risk_level,
-        "claimId": Claim.id,
-    }.get(sort_by, Claim.final_combined_score)
 
 
 def _notification_id() -> str:

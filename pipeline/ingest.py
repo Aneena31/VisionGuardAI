@@ -98,7 +98,26 @@ def _normalize_claims(df: pd.DataFrame) -> pd.DataFrame:
     denominator = df["AmtAllowed"].replace(0, np.nan)
     df["BilledAmountToAllowedRatio"] = (df["AmtCharged"] / denominator).replace([np.inf, -np.inf], np.nan).fillna(0)
     df["row_id"] = df.index + 1
+    df["ClaimId"] = _stable_claim_ids(df)
     return df
+
+
+def _stable_claim_ids(df: pd.DataFrame) -> pd.Series:
+    raw_claim_ids = df.get("ClaimId", df.get("ClaimID", df.get("claim_id")))
+    raw = pd.Series(index=df.index, dtype="float64") if raw_claim_ids is None else pd.to_numeric(raw_claim_ids, errors="coerce")
+    valid_raw = raw.notna() & raw.gt(0)
+    raw_ids = raw.where(valid_raw).astype("Int64")
+    generated_mask = ~valid_raw | raw_ids.duplicated(keep=False)
+    claim_ids = raw_ids.copy()
+    used_ids = set(raw_ids[~generated_mask].dropna().astype(int))
+    next_id = max(used_ids, default=0) + 1
+    for index in df.index[generated_mask]:
+        while next_id in used_ids:
+            next_id += 1
+        claim_ids.loc[index] = next_id
+        used_ids.add(next_id)
+        next_id += 1
+    return claim_ids.astype(int)
 
 
 def clean_single(claim_dict: dict) -> dict:
