@@ -24,8 +24,9 @@ Each value must be a string under 100 words. Do not include any other text."""
 def generate_for_claim(claim_data: dict) -> dict:
     """Call ChatOpenAI and return an investigation summary, with fallback."""
     api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL", config.OPENAI_MODEL_DEFAULT)
     if not api_key:
-        return _fallback_summary(claim_data)
+        return _with_llm_metadata(_fallback_summary(claim_data), False, model, "missing_openai_api_key")
 
     user_content = f"""
 Claim Analysis:
@@ -45,7 +46,7 @@ Generate the investigation summary JSON.
     try:
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", config.OPENAI_MODEL_DEFAULT),
+            model=model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
@@ -59,9 +60,11 @@ Generate the investigation summary JSON.
             "summary": str(parsed.get("summary", "")),
             "riskReasoning": str(parsed.get("riskReasoning", "")),
             "recommendation": str(parsed.get("recommendation", "")),
+            "llmGenerated": True,
+            "model": model,
         }
-    except Exception:
-        return _fallback_summary(claim_data)
+    except Exception as exc:
+        return _with_llm_metadata(_fallback_summary(claim_data), False, model, exc.__class__.__name__)
 
 
 def generate_batch(df: pd.DataFrame, score_threshold: float = config.AI_SUMMARY_SCORE_THRESHOLD) -> pd.DataFrame:
@@ -72,7 +75,7 @@ def generate_batch(df: pd.DataFrame, score_threshold: float = config.AI_SUMMARY_
     for _, row in out.iterrows():
         if row["Final_Combined_Score"] >= score_threshold:
             summary = generate_for_claim(row.to_dict())
-            generated_flags.append(bool(os.getenv("OPENAI_API_KEY")))
+            generated_flags.append(bool(summary.get("llmGenerated")))
             time.sleep(config.AI_RATE_LIMIT_SLEEP)
         else:
             summary = _low_risk_summary()
@@ -158,3 +161,12 @@ def _fallback_provider_summary(provider_data: dict) -> dict:
         ),
         "recommendation": "Prioritize for SIU review." if risk_level in ["High", "Critical"] else "Continue routine monitoring.",
     }
+
+
+def _with_llm_metadata(summary: dict, generated: bool, model: str, reason: str | None = None) -> dict:
+    out = summary.copy()
+    out["llmGenerated"] = generated
+    out["model"] = model
+    if reason:
+        out["fallbackReason"] = reason
+    return out

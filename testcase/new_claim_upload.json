@@ -1,0 +1,17 @@
+{
+  "claim": {
+    "procedureCode": "V2784",
+    "procedureDesc": "Premium Lens Addition",
+    "allowedAmount": 300,
+    "amtCharged": 1000,
+    "units": 1,
+    "memberAge": 42,
+    "memberGender": "Female",
+    "memberId": "MEM-TEST-001",
+    "providerId": "PRV-7121270",
+    "serviceDate": "2026-06-08",
+    "benefitType": "Lens",
+    "serviceCategoryName": "lens material",
+    "benefitCategoryName": "material"
+  }
+}

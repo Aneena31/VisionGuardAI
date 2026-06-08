@@ -30,8 +30,9 @@ type Envelope<T> = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData;
   const response = await fetch(buildApiUrl(path), {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    headers: isFormData ? init?.headers : { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   });
   const envelope = (await response.json()) as Envelope<T>;
@@ -53,6 +54,11 @@ export const api = {
   getNotifications: () => request<any>('/visionguard/notifications'),
   markNotificationRead: (id: string) => request<any>(`/visionguard/notifications/${id}/read`, { method: 'POST' }),
   createScoringJob: (payload: any) => request<any>('/visionguard/scoring/jobs', { method: 'POST', body: JSON.stringify(payload) }),
+  createScoringJobFromFile: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<any>('/visionguard/scoring/jobs', { method: 'POST', body: formData });
+  },
   getScoringJob: (id: string) => request<any>(`/visionguard/scoring/jobs/${id}`),
   getScoringResult: (id: string) => request<any>(`/visionguard/scoring/jobs/${id}/result`),
   assignScoringJob: (id: string) => request<any>(`/visionguard/scoring/jobs/${id}/assign-siu`, { method: 'POST' }),

@@ -1,0 +1,17 @@
+{
+  "claim": {
+    "procedureCode": "V2763",
+    "procedureDesc": "Polycarbonate Lens",
+    "allowedAmount": 180,
+    "amtCharged": 540,
+    "units": 5,
+    "memberAge": 16,
+    "memberGender": "Female",
+    "memberId": "MEM-TEST-003",
+    "providerId": "PRV-8834",
+    "serviceDate": "2026-06-08",
+    "benefitType": "Lens",
+    "serviceCategoryName": "lens material",
+    "benefitCategoryName": "material"
+  }
+}

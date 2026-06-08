@@ -4,7 +4,4 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
-!.env.example
-!.env.development
-!.env.production
+.env

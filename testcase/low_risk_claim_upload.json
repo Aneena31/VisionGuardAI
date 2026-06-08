@@ -1,0 +1,17 @@
+{
+  "claim": {
+    "procedureCode": "V2020",
+    "procedureDesc": "Standard Frame",
+    "allowedAmount": 55,
+    "amtCharged": 65,
+    "units": 1,
+    "memberAge": 36,
+    "memberGender": "Male",
+    "memberId": "MEM-TEST-002",
+    "providerId": "PRV-5102",
+    "serviceDate": "2026-06-08",
+    "benefitType": "Frame",
+    "serviceCategoryName": "frame",
+    "benefitCategoryName": "frame"
+  }
+}

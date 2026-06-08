@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
@@ -79,10 +79,10 @@ async def _extract_claim_input(request: Request, file: Optional[UploadFile]) -> 
         name = (file.filename or "").lower()
         if name.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(raw))
-            return "csv", df.iloc[0].to_dict()
+            return "csv", _first_record(df)
         if name.endswith(".xlsx"):
             df = pd.read_excel(io.BytesIO(raw))
-            return "x12_837", df.iloc[0].to_dict()
+            return "x12_837", _first_record(df)
         if name.endswith(".json"):
             payload = json.loads(raw.decode("utf-8"))
             claim = payload[0] if isinstance(payload, list) else payload.get("claim", payload)
@@ -92,3 +92,18 @@ async def _extract_claim_input(request: Request, file: Optional[UploadFile]) -> 
     payload = await request.json()
     parsed = ScoringJobCreate(**payload)
     return parsed.sourceType, parsed.claim.model_dump()
+
+
+def _first_record(df: pd.DataFrame) -> dict:
+    if df.empty:
+        raise HTTPException(status_code=422, detail="Uploaded claim file is empty.")
+    record = df.where(pd.notnull(df), None).iloc[0].to_dict()
+    return {key: _json_safe(value) for key, value in record.items()}
+
+
+def _json_safe(value: Any) -> Any:
+    if hasattr(value, "item"):
+        value = value.item()
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value

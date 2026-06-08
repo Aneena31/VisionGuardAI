@@ -200,7 +200,7 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None) 
             },
             "statisticalAnalysis": {
                 "claimAmountZScore": claim.z_allowed_amount or 0,
-                "providerZScore": claim.z_allowed_amount or 0,
+                "providerZScore": getattr(claim, "z_prov_allowed", claim.z_allowed_amount) or 0,
                 "narrative": claim.stat_narrative or "",
                 "providerPercentile": min(100, round((claim.provider_stat_score or 0), 1)),
             },
@@ -228,7 +228,7 @@ def build_single_claim_analysis(claim_data: dict) -> dict:
 
 
 def _ad_hoc_claim(data: dict) -> Claim:
-    return Claim(
+    claim = Claim(
         id=data.get("ClaimId", data.get("id", "")),
         provider_id=data.get("ProviderId", ""),
         provider_name=data.get("ProviderName", data.get("ProviderId", "")),
@@ -269,6 +269,10 @@ def _ad_hoc_claim(data: dict) -> Claim:
         cluster_id=data.get("cluster_id", "CL-00"),
         status=data.get("status", "Pending"),
     )
+    claim.z_prov_allowed = float(data.get("Z_Prov_Allowed", 0) or 0)
+    claim.z_prov_units = float(data.get("Z_Prov_Units", 0) or 0)
+    claim.z_prov_ratio = float(data.get("Z_Prov_Ratio", 0) or 0)
+    return claim
 
 
 def _pipeline_context(claim: Claim) -> dict:
