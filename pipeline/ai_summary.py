@@ -131,12 +131,42 @@ Generate provider monitoring JSON.
 def _fallback_summary(claim_data: dict) -> dict:
     risk_level = claim_data.get("Final_Risk_Level", "Low")
     score = float(claim_data.get("Final_Combined_Score", 0) or 0)
+    procedure = claim_data.get("ProcedureCode") or "the submitted procedure"
+    allowed = float(claim_data.get("AmtAllowed", 0) or 0)
+    charged = float(claim_data.get("AmtCharged", 0) or 0)
+    rule_score = float(claim_data.get("Rule_Score_Total", 0) or 0)
+    rule_score_norm = float(claim_data.get("Rule_Score_Norm", 0) or 0)
+    claim_stat = float(claim_data.get("Claim_Stat_Score_Norm", claim_data.get("Claim_Stat_Score", 0)) or 0)
+    provider_stat = float(claim_data.get("Provider_Stat_Score_Norm", claim_data.get("Provider_Stat_Score", 0)) or 0)
+    ml_score = float(claim_data.get("ML_Anomaly_Score_Norm", claim_data.get("ML_Anomaly_Score", 0)) or 0)
+    fraud_type = claim_data.get("Final_Fraud_Type") or "No Significant Fraud Indicators"
+    rule_text = claim_data.get("Rule_Narrative") or "No deterministic rules triggered."
+    stat_text = claim_data.get("Stat_Narrative") or "Historical claim and provider statistics did not add a separate outlier narrative."
+    ml_text = claim_data.get("ML_Anomaly_Narrative") or "ML anomaly checks did not add a separate model narrative."
+    primary_driver = max(
+        [
+            ("rules engine", rule_score_norm),
+            ("claim statistics", claim_stat),
+            ("provider peer statistics", provider_stat),
+            ("ML anomaly model", ml_score),
+        ],
+        key=lambda item: item[1],
+    )
     return {
-        "summary": f"Risk level {risk_level} detected with a fraud score of {score:.0f}/100.",
-        "riskReasoning": claim_data.get("Rule_Narrative")
-        or claim_data.get("Final_Fraud_Reason")
-        or "No specific deterministic rule triggers were identified.",
-        "recommendation": "Route to SIU review." if risk_level in ["High", "Critical"] else "Continue standard adjudication.",
+        "summary": (
+            f"{risk_level} priority review for {procedure}: final score {score:.1f}/100, likely issue "
+            f"{fraud_type}. The claim allowed amount is ${allowed:,.2f} against ${charged:,.2f} billed."
+        ),
+        "riskReasoning": (
+            f"The largest driver is the {primary_driver[0]} at {primary_driver[1]:.1f}/100. "
+            f"Rules engine score is {rule_score:.1f}/{config.MAX_RULE_SCORE} ({rule_score_norm:.1f}/100): {rule_text} "
+            f"Historical comparison: {stat_text} ML review: {ml_text}"
+        ),
+        "recommendation": (
+            "Route to SIU review with the rules, statistical, and ML details attached for analyst validation."
+            if risk_level in ["High", "Critical"]
+            else "Continue standard adjudication, retaining the generated reasoning for audit trail review."
+        ),
     }
 
 

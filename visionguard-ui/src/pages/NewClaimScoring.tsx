@@ -220,7 +220,7 @@ export default function NewClaimScoring() {
           >
             {/* Left Col: Timeline Workflow */}
             <div className="lg:col-span-8 flex flex-col gap-4">
-               {/* Step 1: Business checks */}
+               {/* Step 1: Rules engine */}
                <GlassCard className="p-0 overflow-hidden border-orange-500/30 ring-1 ring-orange-500/10">
                  <div className="px-6 py-4 flex items-center justify-between cursor-pointer bg-slate-900/60" onClick={() => setExpandedStage(0)}>
                    <div className="flex items-center gap-4">
@@ -228,7 +228,7 @@ export default function NewClaimScoring() {
                        <ShieldAlert className="w-4 h-4" />
                      </div>
                      <div>
-                       <h3 className="font-bold text-white text-sm">Billing Policy Checks</h3>
+                       <h3 className="font-bold text-white text-sm">Rules Engine</h3>
                        <p className="text-xs text-slate-400">
                          {triggeredRules.length > 0 ? `${triggeredRules.length} check${triggeredRules.length === 1 ? '' : 's'} need attention` : 'No policy issues found'}
                        </p>

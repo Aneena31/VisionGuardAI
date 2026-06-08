@@ -14,7 +14,7 @@ from pipeline.pipeline import run_single
 
 STAGES = [
     ("validate", "Checking claim details...", 15),
-    ("rules", "Reviewing billing policy checks...", 35),
+    ("rules", "Running rules engine...", 35),
     ("statistics", "Comparing with historical claims...", 55),
     ("ml", "Looking for unusual payment patterns...", 75),
     ("cluster", "Matching to known issue types...", 85),
@@ -59,7 +59,7 @@ def run_pipeline_task(job_id: str, artifacts: dict, population_stats: dict) -> N
         claim_input = json.loads(job.claim_input_json or "{}")
         claim_input["ClaimId"] = job.generated_claim_id
 
-        _update_job(db, job, "processing", 35, "Reviewing billing policy checks...")
+        _update_job(db, job, "processing", 35, "Running rules engine...")
         _update_job(db, job, "processing", 55, "Comparing with historical claims...")
         _update_job(db, job, "processing", 75, "Looking for unusual payment patterns...")
         result = run_single(claim_input, artifacts, population_stats)

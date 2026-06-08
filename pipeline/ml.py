@@ -51,11 +51,7 @@ def apply_unsupervised_ml(df: pd.DataFrame):
     out["ML_Anomaly_Score"] = out["IF_Score_Norm"] * 0.6 + out["PCA_Score_Norm"] * 0.4
     out["ML_Anomaly_Score_Norm"] = out["ML_Anomaly_Score"]
     out["ML_Anomaly_Flag"] = out["ML_Anomaly_Score"] > config.ML_ANOMALY_FLAG_THRESHOLD
-    out["ML_Anomaly_Narrative"] = np.where(
-        out["ML_Anomaly_Flag"],
-        "Isolation Forest and PCA signals indicate anomalous billing behavior.",
-        "ML anomaly checks are within expected range.",
-    )
+    out["ML_Anomaly_Narrative"] = out.apply(_ml_narrative, axis=1)
     return out, scaler, iso, pca, ML_FEATURES
 
 
@@ -116,7 +112,7 @@ def score_single(claim_dict: dict, artifacts: Union[dict, tuple]) -> dict:
     if_norm = float(np.clip(100 * if_score / if_max, 0, 100))
     pca_norm = float(np.clip(100 * pca_error / pca_max, 0, 100))
     ml_score = if_norm * 0.6 + pca_norm * 0.4
-    return {
+    result = {
         "IF_Score": if_score,
         "IF_Score_Norm": if_norm,
         "PCA_Recon_Error": pca_error,
@@ -124,8 +120,34 @@ def score_single(claim_dict: dict, artifacts: Union[dict, tuple]) -> dict:
         "ML_Anomaly_Score": ml_score,
         "ML_Anomaly_Score_Norm": ml_score,
         "ML_Anomaly_Flag": ml_score > config.ML_ANOMALY_FLAG_THRESHOLD,
-        "ML_Anomaly_Narrative": "ML anomaly checks indicate unusual behavior."
-        if ml_score > config.ML_ANOMALY_FLAG_THRESHOLD
-        else "ML anomaly checks are within expected range.",
     }
+    result["ML_Anomaly_Narrative"] = _ml_narrative(pd.Series({**claim_dict, **result}))
+    return result
+
+
+def _ml_narrative(row: pd.Series) -> str:
+    if_score = float(row.get("IF_Score_Norm", 0) or 0)
+    pca_score = float(row.get("PCA_Score_Norm", 0) or 0)
+    ml_score = float(row.get("ML_Anomaly_Score_Norm", row.get("ML_Anomaly_Score", 0)) or 0)
+    allowed = float(row.get("AmtAllowed", 0) or 0)
+    charged = float(row.get("AmtCharged", 0) or 0)
+    ratio = float(row.get("BilledAmountToAllowedRatio", 0) or 0)
+    procedure = row.get("ProcedureCode", "the submitted procedure")
+
+    if ml_score > config.ML_ANOMALY_FLAG_THRESHOLD:
+        strongest_signal = "payment amount pattern" if if_score >= pca_score else "claim feature reconstruction pattern"
+        return (
+            f"ML anomaly checks are elevated for {procedure}: the combined ML score is {ml_score:.1f}/100, "
+            f"with Isolation Forest at {if_score:.1f}/100 and PCA reconstruction at {pca_score:.1f}/100. "
+            f"The strongest signal is the {strongest_signal}. The claim allowed amount is ${allowed:,.2f} "
+            f"against ${charged:,.2f} billed, a billed-to-allowed ratio of {ratio:.2f}, which makes the claim "
+            "worth manual review against comparable historical claims."
+        )
+
+    return (
+        f"ML anomaly checks are not elevated for {procedure}: the combined ML score is {ml_score:.1f}/100, "
+        f"with Isolation Forest at {if_score:.1f}/100 and PCA reconstruction at {pca_score:.1f}/100. "
+        f"The allowed amount is ${allowed:,.2f} and the billed-to-allowed ratio is {ratio:.2f}, which remains "
+        "within the model's expected historical pattern."
+    )
 
