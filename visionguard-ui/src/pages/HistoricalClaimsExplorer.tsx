@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { GlassCard, RiskBadge } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
-import { claims as mockClaims } from '../data';
 import { Search, CalendarDays, SlidersHorizontal, ChevronRight, RefreshCw, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import type { Claim } from '../types';
 
 const asText = (value: unknown, fallback = '') => (value === null || value === undefined ? fallback : String(value));
 const asNumber = (value: unknown, fallback = 0) => {
@@ -12,7 +12,7 @@ const asNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const normalizeClaim = (claim: any) => ({
+const normalizeClaim = (claim: any): Claim => ({
   id: asText(claim?.id, 'UNKNOWN'),
   providerId: asText(claim?.providerId),
   providerName: asText(claim?.providerName || claim?.providerId, 'Unknown Provider'),
@@ -21,11 +21,11 @@ const normalizeClaim = (claim: any) => ({
   procedureDesc: asText(claim?.procedureDesc),
   allowedAmount: asNumber(claim?.allowedAmount),
   fraudScore: asNumber(claim?.fraudScore),
-  riskLevel: asText(claim?.riskLevel, 'Low'),
+  riskLevel: asText(claim?.riskLevel, 'Low') as Claim['riskLevel'],
   fraudType: claim?.fraudType ? asText(claim.fraudType) : null,
   clusterId: asText(claim?.clusterId, 'CL-00'),
-  date: claim?.date ? asText(claim.date) : null,
-  status: asText(claim?.status, 'Pending'),
+  date: claim?.date ? asText(claim.date) : '',
+  status: asText(claim?.status, 'Pending') as Claim['status'],
 });
 
 const normalizeClaims = (items: any) => (Array.isArray(items) ? items.map(normalizeClaim) : []);
@@ -44,18 +44,25 @@ export default function HistoricalClaimsExplorer() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [riskFilter, setRiskFilter] = useState('All');
-  const [claims, setClaims] = useState(mockClaims);
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
   const [retrainRun, setRetrainRun] = useState<any>(null);
   const [retrainMessage, setRetrainMessage] = useState('');
 
   useEffect(() => {
-    const params = new URLSearchParams({ pageSize: '100' });
+    const params = new URLSearchParams({ page: String(pagination.page), pageSize: '20' });
     if (searchTerm) params.set('search', searchTerm);
     if (riskFilter !== 'All') params.set('riskLevel', riskFilter);
     api.getClaims(`?${params.toString()}`)
-      .then((data) => setClaims(normalizeClaims(data?.items)))
-      .catch(() => setClaims(mockClaims));
-  }, [searchTerm, riskFilter]);
+      .then((data) => {
+        setClaims(normalizeClaims(data?.items));
+        setPagination(data?.pagination || { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
+      })
+      .catch(() => {
+        setClaims([]);
+        setPagination({ page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
+      });
+  }, [searchTerm, riskFilter, pagination.page]);
 
   useEffect(() => {
     latestRetrain()
@@ -72,7 +79,12 @@ export default function HistoricalClaimsExplorer() {
           setRetrainRun(data.run);
           if (data.run?.status === 'completed') {
             setRetrainMessage(`Retrain complete: ${data.run.claimsProcessed.toLocaleString()} workbook claims processed.`);
-            api.getClaims('?pageSize=100').then((claimsData) => setClaims(normalizeClaims(claimsData?.items))).catch(() => undefined);
+            api.getClaims('?page=1&pageSize=20')
+              .then((claimsData) => {
+                setClaims(normalizeClaims(claimsData?.items));
+                setPagination(claimsData?.pagination || { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 });
+              })
+              .catch(() => undefined);
           }
           if (data.run?.status === 'failed') {
             setRetrainMessage(data.run.errorMessage || 'Model retrain failed. Check the API logs for details.');
@@ -85,6 +97,7 @@ export default function HistoricalClaimsExplorer() {
   }, [retrainRun?.id, retrainRun?.status]);
 
   const isRetraining = !!retrainRun && ['queued', 'running'].includes(retrainRun.status);
+  const visibleClaims = normalizeClaims(claims);
 
   const handleRetrain = async () => {
     setRetrainMessage('');
@@ -96,15 +109,6 @@ export default function HistoricalClaimsExplorer() {
       setRetrainMessage(error instanceof Error ? error.message : 'Unable to start model retrain.');
     }
   };
-
-  const filteredClaims = normalizeClaims(claims).filter(c => {
-    const matchesSearch = 
-      c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      c.providerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.procedureCode.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRisk = riskFilter === 'All' || c.riskLevel === riskFilter;
-    return matchesSearch && matchesRisk;
-  });
 
   return (
     <motion.div
@@ -144,7 +148,10 @@ export default function HistoricalClaimsExplorer() {
             type="text" 
             placeholder="Search Claim ID, Provider, Procedure..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPagination((current) => ({ ...current, page: 1 }));
+            }}
             className="w-full bg-charcoal border border-glass-border rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-neon-blue/50 text-white placeholder:text-slate-500"
           />
         </div>
@@ -152,7 +159,10 @@ export default function HistoricalClaimsExplorer() {
         <div className="flex gap-4 w-full md:w-auto">
           <select 
             value={riskFilter}
-            onChange={(e) => setRiskFilter(e.target.value)}
+            onChange={(e) => {
+              setRiskFilter(e.target.value);
+              setPagination((current) => ({ ...current, page: 1 }));
+            }}
             className="bg-charcoal border border-glass-border rounded-lg py-2 px-4 text-sm text-white focus:outline-none appearance-none"
           >
             <option value="All">All Risks</option>
@@ -171,6 +181,30 @@ export default function HistoricalClaimsExplorer() {
       </GlassCard>
 
       <GlassCard className="flex-1 overflow-hidden flex flex-col p-0">
+        <div className="px-6 py-3 border-b border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+          <span>
+            Showing {visibleClaims.length} of {pagination.totalItems.toLocaleString()} claims
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPagination((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+              disabled={pagination.page <= 1}
+              className="px-3 py-1 rounded-md bg-slate-900 disabled:opacity-40 text-white"
+            >
+              Prev
+            </button>
+            <span>Page {pagination.page} / {Math.max(pagination.totalPages, 1)}</span>
+            <button
+              type="button"
+              onClick={() => setPagination((current) => ({ ...current, page: Math.min(Math.max(1, current.totalPages), current.page + 1) }))}
+              disabled={pagination.page >= pagination.totalPages}
+              className="px-3 py-1 rounded-md bg-slate-900 disabled:opacity-40 text-white"
+            >
+              Next
+            </button>
+          </div>
+        </div>
         <div className="overflow-x-auto flex-1 h-full relative custom-scrollbar">
           <table className="w-full text-left border-collapse min-w-[900px]">
              <thead className="sticky top-0 bg-slate-950 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-800 z-10">
@@ -188,13 +222,13 @@ export default function HistoricalClaimsExplorer() {
              </thead>
              <tbody className="text-xs text-slate-300">
                <AnimatePresence>
-                 {filteredClaims.map((claim, idx) => (
+                 {visibleClaims.map((claim, idx) => (
                    <motion.tr 
                      key={claim.id}
                      initial={{ opacity: 0, y: 10 }}
                      animate={{ opacity: 1, y: 0 }}
                      exit={{ opacity: 0 }}
-                     transition={{ delay: idx * 0.05 }}
+                     transition={{ delay: idx * 0.01 }}
                      className="border-b border-slate-800/50 hover:bg-cyan-500/5 transition-colors group cursor-pointer"
                      onClick={() => navigate(`/claims/${claim.id}`)}
                    >
@@ -229,7 +263,7 @@ export default function HistoricalClaimsExplorer() {
                </AnimatePresence>
              </tbody>
           </table>
-          {filteredClaims.length === 0 && (
+          {visibleClaims.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
               <Search className="w-12 h-12 mb-4 opacity-20" />
               <p>No claims found matching these criteria.</p>

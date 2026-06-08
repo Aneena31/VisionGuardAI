@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -14,6 +15,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from api.routers import claims, dashboard, notifications, providers, scoring, search, system
 from api.schemas.common import make_error_response, make_response
 from db.database import init_db
+from db.models import Claim, ProviderGold
+from db.database import SessionLocal
 from pipeline import config, ingest, ml, stats
 
 
@@ -46,17 +49,39 @@ async def request_id_middleware(request: Request, call_next):
 
 @app.on_event("startup")
 def startup_event() -> None:
+    t0 = time.perf_counter()
+    print("[VisionGuard] API startup started", flush=True)
     init_db()
     artifacts_path = Path(os.getenv("ARTIFACTS_PATH", str(config.DEFAULT_ARTIFACTS_PATH)))
     required = ["scaler.pkl", "isolation_forest.pkl", "pca.pkl", "ml_features.json"]
+    step_t0 = time.perf_counter()
     if all((artifacts_path / name).exists() for name in required):
         app.state.artifacts = ml.load_artifacts(artifacts_path)
+        print(f"[VisionGuard] startup artifacts loaded duration={time.perf_counter() - step_t0:.3f}s", flush=True)
     else:
         app.state.artifacts = None
+        print("[VisionGuard] startup artifacts missing; single-claim ML scoring will wait for retrain/seed", flush=True)
 
+    step_t0 = time.perf_counter()
     claims_df = ingest.load_and_clean(str(config.DEFAULT_DATA_FILE_PATH))
     claims_df = stats.apply_statistical_outliers(claims_df)
     app.state.population_stats = stats.get_population_stats_from_frame(claims_df)
+    print(
+        f"[VisionGuard] startup population stats loaded rows={len(claims_df):,} "
+        f"duration={time.perf_counter() - step_t0:.3f}s",
+        flush=True,
+    )
+    db = SessionLocal()
+    try:
+        claim_count = db.query(Claim).count()
+        provider_count = db.query(ProviderGold).count()
+        print(
+            f"[VisionGuard] startup database ready claims={claim_count:,} providers={provider_count:,} "
+            f"totalDuration={time.perf_counter() - t0:.3f}s",
+            flush=True,
+        )
+    finally:
+        db.close()
 
 
 app.include_router(dashboard.router)

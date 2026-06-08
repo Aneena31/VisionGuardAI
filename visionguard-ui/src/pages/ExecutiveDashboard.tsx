@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { GlassCard } from '../components/ui';
 import { motion } from 'motion/react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import { fraudTrendData as mockTrend, providers as mockProviders, claims as mockClaims } from '../data';
 import { TrendingUp, AlertTriangle, Activity, DollarSign, Users, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
@@ -21,17 +20,17 @@ export default function ExecutiveDashboard() {
   const kpis = dashboard?.kpis;
   const fraudTrendData = dashboard?.fraudTrend?.length
     ? dashboard.fraudTrend.map((item: any) => ({ month: item.label, fraudAmount: item.fraudAmount, claims: item.claimCount }))
-    : mockTrend;
-  const providerRows = dashboard?.topSuspiciousProviders?.length ? dashboard.topSuspiciousProviders : mockProviders;
-  const totalAnalyzed = dashboard?.riskDistribution?.totalAnalyzed ?? mockClaims.length;
+    : [];
+  const providerRows = dashboard?.topSuspiciousProviders?.length ? dashboard.topSuspiciousProviders : [];
+  const totalAnalyzed = dashboard?.riskDistribution?.totalAnalyzed ?? 0;
   
   const riskDistribution = dashboard?.riskDistribution?.items?.length
     ? dashboard.riskDistribution.items.map((item: any) => ({ name: item.riskLevel, value: item.count }))
     : [
-        { name: 'Low', value: mockClaims.filter(c => c.riskLevel === 'Low').length },
-        { name: 'Medium', value: mockClaims.filter(c => c.riskLevel === 'Medium').length },
-        { name: 'High', value: mockClaims.filter(c => c.riskLevel === 'High').length },
-        { name: 'Critical', value: mockClaims.filter(c => c.riskLevel === 'Critical').length },
+        { name: 'Low', value: 0 },
+        { name: 'Medium', value: 0 },
+        { name: 'High', value: 0 },
+        { name: 'Critical', value: 0 },
       ];
 
   const exportReport = () => {
@@ -60,10 +59,10 @@ export default function ExecutiveDashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Total Claims Analyzed', value: (kpis?.totalClaimsAnalyzed?.value ?? 45291).toLocaleString(), trend: `+${kpis?.totalClaimsAnalyzed?.trendPercent ?? 12}%`, icon: Activity, valueColor: 'text-white', trendColor: 'text-green-400', border: '' },
-          { label: 'Total Allowed Amount', value: `$${Math.round((kpis?.totalAllowedAmount?.value ?? 4200000)).toLocaleString()}`, trend: `+${kpis?.totalAllowedAmount?.trendPercent ?? 5}%`, icon: DollarSign, valueColor: 'text-white', trendColor: 'text-green-400', border: '' },
-          { label: 'Average Fraud Score', value: (kpis?.averageFraudScore?.value ?? 74.2).toFixed(1), trend: `+${kpis?.averageFraudScore?.trendPercent ?? 12.8}%`, icon: ShieldAlert, valueColor: 'text-orange-400', trendColor: 'text-red-400', border: 'ring-1 ring-orange-500/20' },
-          { label: 'Critical Claims Flagged', value: (kpis?.criticalClaimsFlagged?.value ?? 312).toLocaleString(), trend: `${(kpis?.criticalClaimsFlagged?.shareOfTotalPercent ?? 2.1).toFixed(1)}%`, icon: AlertTriangle, valueColor: 'text-red-500', trendColor: 'text-slate-400', border: 'ring-1 ring-red-500/20' },
+          { label: 'Total Claims Analyzed', value: (kpis?.totalClaimsAnalyzed?.value ?? 0).toLocaleString(), trend: `+${kpis?.totalClaimsAnalyzed?.trendPercent ?? 0}%`, icon: Activity, valueColor: 'text-white', trendColor: 'text-green-400', border: '' },
+          { label: 'Total Allowed Amount', value: `$${Math.round((kpis?.totalAllowedAmount?.value ?? 0)).toLocaleString()}`, trend: `+${kpis?.totalAllowedAmount?.trendPercent ?? 0}%`, icon: DollarSign, valueColor: 'text-white', trendColor: 'text-green-400', border: '' },
+          { label: 'Average Fraud Score', value: (kpis?.averageFraudScore?.value ?? 0).toFixed(1), trend: `+${kpis?.averageFraudScore?.trendPercent ?? 0}%`, icon: ShieldAlert, valueColor: 'text-orange-400', trendColor: 'text-red-400', border: 'ring-1 ring-orange-500/20' },
+          { label: 'Critical Claims Flagged', value: (kpis?.criticalClaimsFlagged?.value ?? 0).toLocaleString(), trend: `${(kpis?.criticalClaimsFlagged?.shareOfTotalPercent ?? 0).toFixed(1)}%`, icon: AlertTriangle, valueColor: 'text-red-500', trendColor: 'text-slate-400', border: 'ring-1 ring-red-500/20' },
         ].map((kpi, idx) => (
           <GlassCard key={idx} className={`p-4 flex flex-col justify-between ${kpi.border}`}>
             <div className="flex justify-between items-start mb-2">
