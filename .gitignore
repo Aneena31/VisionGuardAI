@@ -10,9 +10,4 @@ venv/
 
 data/
 
-
-artifacts/*.pkl
-artifacts/*.json
-!artifacts/.gitkeep
-
 *.log
