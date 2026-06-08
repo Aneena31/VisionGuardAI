@@ -2,23 +2,32 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from db.models import Claim, ProviderGold
+from api.services import historical_data_service
 from api.services.provider_service import provider_summary
 
 
 def overview(db: Session) -> dict:
-    total_claims = db.query(func.count(Claim.id)).scalar() or 0
-    total_allowed = db.query(func.coalesce(func.sum(Claim.amt_allowed), 0)).scalar() or 0
-    avg_score = db.query(func.coalesce(func.avg(Claim.final_combined_score), 0)).scalar() or 0
-    critical = db.query(func.count(Claim.id)).filter(Claim.final_risk_level == "Critical").scalar() or 0
+    data = historical_data_service.get_historical_data()
+    claims = data.claims
+    providers = list(data.providers_by_id.values())
 
-    claims = db.query(Claim.service_date, Claim.final_risk_level, Claim.amt_allowed).all()
+    total_claims = len(claims)
+    total_allowed = sum(float(claim.amt_allowed or 0) for claim in claims)
+    avg_score = (
+        sum(float(claim.final_combined_score or 0) for claim in claims) / total_claims
+        if total_claims
+        else 0
+    )
+    critical = sum(1 for claim in claims if claim.final_risk_level == "Critical")
+
     trend = defaultdict(lambda: {"fraudAmount": 0.0, "claimCount": 0})
     risk_counts = Counter()
-    for service_date, risk_level, amt_allowed in claims:
+    for claim in claims:
+        service_date = claim.service_date
+        risk_level = claim.final_risk_level or "Low"
+        amt_allowed = claim.amt_allowed or 0
         risk_counts[risk_level or "Low"] += 1
         if service_date:
             key = service_date.strftime("%Y-%m")
@@ -26,9 +35,7 @@ def overview(db: Session) -> dict:
             if risk_level in ["High", "Critical"]:
                 trend[key]["fraudAmount"] += float(amt_allowed or 0)
 
-    top_providers = (
-        db.query(ProviderGold).order_by(ProviderGold.provider_risk_score.desc()).limit(5).all()
-    )
+    top_providers = sorted(providers, key=lambda provider: provider.provider_risk_score or 0, reverse=True)[:5]
     return {
         "kpis": {
             "totalClaimsAnalyzed": {"value": total_claims, "trendPercent": 0.0, "trendDirection": "up"},
@@ -59,4 +66,3 @@ def _month_label(period: str) -> str:
     month = int(period.split("-")[1])
     labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     return labels[month - 1]
-
