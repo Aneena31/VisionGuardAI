@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+import pandas as pd
+
 from pipeline import aggregation, ai_summary, config, ingest, ml, rules, scoring, similarity, stats
 
 
@@ -9,6 +11,16 @@ def run_batch(file_path: Optional[str] = None):
     """Run the full historical batch pipeline."""
     source = file_path or str(config.DEFAULT_DATA_FILE_PATH)
     df = ingest.load_and_clean(source)
+    return run_clean_batch(df)
+
+
+def run_batch_dataframe(df: pd.DataFrame):
+    """Run the full historical batch pipeline from an in-memory raw claims frame."""
+    return run_clean_batch(ingest.clean_dataframe(df))
+
+
+def run_clean_batch(df: pd.DataFrame):
+    """Run the full historical batch pipeline from normalized claims."""
     df = rules.apply_rules(df)
     df = rules.generate_rule_narratives(df)
     df = rules.apply_rule_scoring(df)

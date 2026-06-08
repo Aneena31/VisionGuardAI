@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Request
+import pandas as pd
 from sqlalchemy.orm import Session
 
 from db.models import Claim, Notification, PipelineRun, ProviderGold
-from pipeline import config, ml, stats
+from pipeline import config, ingest, ml, stats
 
 
 _retrain_lock = threading.Lock()
@@ -55,7 +56,7 @@ def start_sync_retrain(request: Request, db: Session) -> dict[str, Any]:
 
 def run_sync_retrain(db: Session, app: Any, run_id: str) -> None:
     from db.seed import _claim_from_row, _provider_gold_payload
-    from pipeline.pipeline import run_batch
+    from pipeline.pipeline import run_batch_dataframe
 
     run = db.get(PipelineRun, run_id)
     if not run:
@@ -78,7 +79,18 @@ def run_sync_retrain(db: Session, app: Any, run_id: str) -> None:
             raise FileNotFoundError(f"Claims data source not found: {data_source}")
 
         t0 = time.perf_counter()
-        claims_df, provider_gold_df, artifacts = run_batch(str(data_source))
+        imported_claims_df = ingest.load_and_clean_source(str(data_source))
+
+        db.query(Notification).delete()
+        db.query(ProviderGold).delete()
+        db.query(Claim).delete()
+        db.commit()
+
+        db.bulk_save_objects([_claim_from_row(row) for _, row in imported_claims_df.iterrows()])
+        db.commit()
+
+        training_df = _claims_to_training_frame(db)
+        claims_df, provider_gold_df, artifacts = run_batch_dataframe(training_df)
         ml.save_artifacts(
             artifacts["scaler"],
             artifacts["isolation_forest"],
@@ -88,7 +100,6 @@ def run_sync_retrain(db: Session, app: Any, run_id: str) -> None:
             artifacts["score_stats"],
         )
 
-        db.query(Notification).delete()
         db.query(ProviderGold).delete()
         db.query(Claim).delete()
         db.commit()
@@ -137,6 +148,38 @@ def _is_run_active(db: Session) -> bool:
 
 def _latest_run(db: Session) -> PipelineRun | None:
     return db.query(PipelineRun).order_by(PipelineRun.started_at.desc()).first()
+
+
+def _claims_to_training_frame(db: Session) -> pd.DataFrame:
+    claims = db.query(Claim).order_by(Claim.row_id.asc(), Claim.id.asc()).all()
+    return pd.DataFrame(
+        [
+            {
+                "ClaimId": claim.raw_claim_id or claim.row_id,
+                "AdjustmentVersion": claim.adjustment_version,
+                "LineNumber": claim.line_number,
+                "ProviderId": claim.provider_id,
+                "ProcedureCode": claim.procedure_code,
+                "ProcedureDesc": claim.procedure_desc,
+                "ServiceCategoryName": claim.service_category_name,
+                "BenefitCategoryName": claim.benefit_category_name,
+                "BenefitType": claim.benefit_type,
+                "ServiceMonth": claim.service_date,
+                "MemberId": claim.member_id,
+                "MemberAge": claim.member_age,
+                "Gender": claim.member_gender,
+                "SubscriberId": claim.subscriber_id,
+                "GroupId": claim.group_id,
+                "AmtCharged": claim.amt_charged,
+                "PaidAmount": claim.paid_amount,
+                "AllowedAmount": claim.amt_allowed,
+                "AllowedUnits": claim.allowed_units,
+                "UnitsUsed": claim.units_used,
+                "UtilizationPctAmt": claim.utilization_pct_amt,
+            }
+            for claim in claims
+        ]
+    )
 
 
 def _run_payload(run: PipelineRun | None) -> dict[str, Any] | None:

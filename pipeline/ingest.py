@@ -40,6 +40,11 @@ SUPPORTED_DATA_EXTENSIONS = {".csv", ".xls", ".xlsx"}
 def load_and_clean(file_path: str) -> pd.DataFrame:
     """Load one raw claims file, derive standard pipeline columns, and assign row_id."""
     df = _read_claim_file(Path(file_path))
+    return clean_dataframe(df)
+
+
+def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Derive standard pipeline columns for an in-memory claims frame."""
     return _normalize_claims(df)
 
 

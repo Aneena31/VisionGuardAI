@@ -9,5 +9,6 @@ venv/
 .venv/
 
 data/
+data/Sample_Data_for_ML.xlsx
 
 *.log
