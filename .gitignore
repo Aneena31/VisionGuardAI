@@ -1,5 +1,4 @@
 .env
-.env.example
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -9,10 +8,6 @@ __pycache__/
 venv/
 .venv/
 
-visionguard.db
-*.db
-*.sqlite
-*.sqlite3
 
 artifacts/*.pkl
 artifacts/*.json
