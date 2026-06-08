@@ -37,11 +37,11 @@ export default function HistoricalClaimsExplorer() {
         .then((data) => {
           setSyncRun(data.run);
           if (data.run?.status === 'completed') {
-            setSyncMessage(`Retrain complete: ${data.run.claimsProcessed.toLocaleString()} historical claims synced.`);
+            setSyncMessage(`Sync complete: ${data.run.claimsProcessed.toLocaleString()} historical claims loaded.`);
             api.getClaims('?pageSize=100').then((claimsData) => setClaims(claimsData.items)).catch(() => undefined);
           }
           if (data.run?.status === 'failed') {
-            setSyncMessage(data.run.errorMessage || 'Retrain failed. Check the API logs for details.');
+            setSyncMessage(data.run.errorMessage || 'Claim sync failed. Check the API logs for details.');
           }
         })
         .catch(() => undefined);
@@ -59,7 +59,7 @@ export default function HistoricalClaimsExplorer() {
       setSyncRun(data.run);
       setSyncMessage(data.message);
     } catch (error) {
-      setSyncMessage(error instanceof Error ? error.message : 'Unable to start retrain.');
+      setSyncMessage(error instanceof Error ? error.message : 'Unable to start claim sync.');
     }
   };
 
@@ -93,7 +93,7 @@ export default function HistoricalClaimsExplorer() {
             className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400 text-slate-950 rounded-lg py-2 px-4 text-sm font-bold flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
           >
             {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-            {isSyncing ? 'Syncing & Retraining' : 'Sync & Retrain ML'}
+            {isSyncing ? 'Syncing Claims' : 'Sync Claims'}
           </button>
           {(syncMessage || syncRun) && (
             <div className="text-xs text-slate-400 text-left sm:text-right max-w-[360px]">

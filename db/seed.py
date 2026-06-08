@@ -26,10 +26,10 @@ load_dotenv()
 
 def seed() -> None:
     init_db()
-    data_file = Path(os.getenv("DATA_FILE_PATH", str(config.DEFAULT_DATA_FILE_PATH)))
+    data_source = _data_source_path()
     artifacts_path = Path(os.getenv("ARTIFACTS_PATH", str(config.DEFAULT_ARTIFACTS_PATH)))
-    if not data_file.exists():
-        raise FileNotFoundError(f"Data file not found: {data_file}")
+    if not data_source.exists():
+        raise FileNotFoundError(f"Claims data source not found: {data_source}")
 
     started_at = datetime.utcnow()
     run_id = f"RUN-{started_at:%Y%m%d}-001"
@@ -39,7 +39,7 @@ def seed() -> None:
 
     try:
         t0 = time.perf_counter()
-        claims_df, provider_gold_df, artifacts = run_batch(str(data_file))
+        claims_df, provider_gold_df, artifacts = run_batch(str(data_source))
         ml.save_artifacts(
             artifacts["scaler"],
             artifacts["isolation_forest"],
@@ -189,6 +189,16 @@ def _provider_gold_payload(row: pd.Series) -> dict:
         "ai_velocity_indicator": _str(row.get("ai_velocity_indicator")),
         "ai_recommendation": _str(row.get("ai_recommendation")),
     }
+
+
+def _data_source_path() -> Path:
+    configured_dir = os.getenv("DATA_DIR_PATH")
+    if configured_dir:
+        return Path(configured_dir)
+    configured_file = os.getenv("DATA_FILE_PATH")
+    if configured_file:
+        return Path(configured_file)
+    return config.DEFAULT_DATA_DIR_PATH
 
 
 def _provider_name(row: pd.Series, provider_id: str) -> str:

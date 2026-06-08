@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -33,9 +34,49 @@ def _service_month(value: Any) -> Any:
     return parsed
 
 
+SUPPORTED_DATA_EXTENSIONS = {".csv", ".xls", ".xlsx"}
+
+
 def load_and_clean(file_path: str) -> pd.DataFrame:
-    """Load raw Excel, derive standard pipeline columns, and assign row_id."""
-    df = pd.read_excel(file_path)
+    """Load one raw claims file, derive standard pipeline columns, and assign row_id."""
+    df = _read_claim_file(Path(file_path))
+    return _normalize_claims(df)
+
+
+def load_and_clean_source(source: str) -> pd.DataFrame:
+    """Load one claims file or every supported claims file in a directory."""
+    path = Path(source)
+    if path.is_dir():
+        files = sorted(
+            item
+            for item in path.iterdir()
+            if item.is_file()
+            and item.suffix.lower() in SUPPORTED_DATA_EXTENSIONS
+            and not item.name.startswith("~$")
+        )
+        if not files:
+            supported = ", ".join(sorted(SUPPORTED_DATA_EXTENSIONS))
+            raise FileNotFoundError(f"No supported claims files ({supported}) found in: {path}")
+        frames = [_normalize_claims(_read_claim_file(file)) for file in files]
+        combined = pd.concat(frames, ignore_index=True)
+        combined["row_id"] = combined.index + 1
+        return combined
+    return load_and_clean(str(path))
+
+
+def _read_claim_file(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Data file not found: {path}")
+    suffix = path.suffix.lower()
+    if suffix == ".csv":
+        return pd.read_csv(path)
+    if suffix in {".xls", ".xlsx"}:
+        return pd.read_excel(path)
+    supported = ", ".join(sorted(SUPPORTED_DATA_EXTENSIONS))
+    raise ValueError(f"Unsupported claims file type '{suffix}'. Supported types: {supported}")
+
+
+def _normalize_claims(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     df["AmtAllowed"] = pd.to_numeric(df.get("AllowedAmount"), errors="coerce").fillna(0)
@@ -76,4 +117,3 @@ def clean_single(claim_dict: dict) -> dict:
     claim["BenefitCategoryName"] = _text(claim.get("benefitCategoryName", claim.get("BenefitCategoryName", "")))
     claim["ServiceMonth"] = _service_month(claim.get("serviceDate", claim.get("ServiceMonth")))
     return claim
-
