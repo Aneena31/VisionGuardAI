@@ -6,6 +6,40 @@ import { Search, CalendarDays, SlidersHorizontal, ChevronRight, RefreshCw, Datab
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
+const asText = (value: unknown, fallback = '') => (value === null || value === undefined ? fallback : String(value));
+const asNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeClaim = (claim: any) => ({
+  id: asText(claim?.id, 'UNKNOWN'),
+  providerId: asText(claim?.providerId),
+  providerName: asText(claim?.providerName || claim?.providerId, 'Unknown Provider'),
+  memberId: asText(claim?.memberId),
+  procedureCode: asText(claim?.procedureCode, 'N/A'),
+  procedureDesc: asText(claim?.procedureDesc),
+  allowedAmount: asNumber(claim?.allowedAmount),
+  fraudScore: asNumber(claim?.fraudScore),
+  riskLevel: asText(claim?.riskLevel, 'Low'),
+  fraudType: claim?.fraudType ? asText(claim.fraudType) : null,
+  clusterId: asText(claim?.clusterId, 'CL-00'),
+  date: claim?.date ? asText(claim.date) : null,
+  status: asText(claim?.status, 'Pending'),
+});
+
+const normalizeClaims = (items: any) => (Array.isArray(items) ? items.map(normalizeClaim) : []);
+const latestRetrain = () => {
+  const client = api as any;
+  const request = client.getLatestClaimsRetrain || client.getLatestSyncRetrain;
+  return request ? request() : Promise.resolve({ run: null });
+};
+const startRetrain = () => {
+  const client = api as any;
+  const request = client.retrainClaimsModel || client.syncRetrainClaims;
+  return request ? request() : Promise.reject(new Error('Retrain service unavailable.'));
+};
+
 export default function HistoricalClaimsExplorer() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,12 +53,12 @@ export default function HistoricalClaimsExplorer() {
     if (searchTerm) params.set('search', searchTerm);
     if (riskFilter !== 'All') params.set('riskLevel', riskFilter);
     api.getClaims(`?${params.toString()}`)
-      .then((data) => setClaims(data.items))
+      .then((data) => setClaims(normalizeClaims(data?.items)))
       .catch(() => setClaims(mockClaims));
   }, [searchTerm, riskFilter]);
 
   useEffect(() => {
-    api.getLatestClaimsRetrain()
+    latestRetrain()
       .then((data) => setRetrainRun(data.run))
       .catch(() => undefined);
   }, []);
@@ -33,12 +67,12 @@ export default function HistoricalClaimsExplorer() {
     if (!retrainRun || !['queued', 'running'].includes(retrainRun.status)) return;
 
     const timer = window.setInterval(() => {
-      api.getLatestClaimsRetrain()
+      latestRetrain()
         .then((data) => {
           setRetrainRun(data.run);
           if (data.run?.status === 'completed') {
             setRetrainMessage(`Retrain complete: ${data.run.claimsProcessed.toLocaleString()} workbook claims processed.`);
-            api.getClaims('?pageSize=100').then((claimsData) => setClaims(claimsData.items)).catch(() => undefined);
+            api.getClaims('?pageSize=100').then((claimsData) => setClaims(normalizeClaims(claimsData?.items))).catch(() => undefined);
           }
           if (data.run?.status === 'failed') {
             setRetrainMessage(data.run.errorMessage || 'Model retrain failed. Check the API logs for details.');
@@ -55,7 +89,7 @@ export default function HistoricalClaimsExplorer() {
   const handleRetrain = async () => {
     setRetrainMessage('');
     try {
-      const data = await api.retrainClaimsModel();
+      const data = await startRetrain();
       setRetrainRun(data.run);
       setRetrainMessage(data.message);
     } catch (error) {
@@ -63,7 +97,7 @@ export default function HistoricalClaimsExplorer() {
     }
   };
 
-  const filteredClaims = claims.filter(c => {
+  const filteredClaims = normalizeClaims(claims).filter(c => {
     const matchesSearch = 
       c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
       c.providerName.toLowerCase().includes(searchTerm.toLowerCase()) ||

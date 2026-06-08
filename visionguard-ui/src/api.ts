@@ -48,6 +48,8 @@ export const api = {
   getClaims: (params = '') => request<any>(`/visionguard/claims${params}`),
   retrainClaimsModel: () => request<any>('/visionguard/claims/retrain', { method: 'POST' }),
   getLatestClaimsRetrain: () => request<any>('/visionguard/claims/retrain/latest'),
+  syncRetrainClaims: () => request<any>('/visionguard/claims/retrain', { method: 'POST' }),
+  getLatestSyncRetrain: () => request<any>('/visionguard/claims/retrain/latest'),
   getClaim: (id: string) => request<any>(`/visionguard/claims/${id}`),
   flagClaim: (id: string) => request<any>(`/visionguard/claims/${id}/flag-siu`, { method: 'POST' }),
   getProviders: (params = '') => request<any>(`/visionguard/providers${params}`),

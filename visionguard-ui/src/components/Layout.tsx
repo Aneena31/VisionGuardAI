@@ -16,12 +16,7 @@ export function Layout() {
   const location = useLocation();
   const [systemStatus, setSystemStatus] = useState({ modelAi: 'OFFLINE', pipeline: 'STALE' });
   const [unreadCount, setUnreadCount] = useState(0);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window === 'undefined') return 'dark';
-    const savedTheme = window.localStorage.getItem('visionguard-theme');
-    if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-  });
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
     api.getSystemStatus().then(setSystemStatus).catch(() => undefined);
