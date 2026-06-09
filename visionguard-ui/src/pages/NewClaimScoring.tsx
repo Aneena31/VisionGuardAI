@@ -1,11 +1,74 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { GlassCard } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
-import { UploadCloud, FileText, Loader2, ShieldAlert, Activity, BrainCircuit, Users, ChevronDown, ChevronRight, Zap } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, ShieldAlert, Activity, BrainCircuit, Users, ChevronDown, ChevronRight, Zap, ArrowRight, X } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 
 type Step = 'upload' | 'processing' | 'result';
+
+type SampleClaim = {
+  id: string;
+  filename: string;
+  label: string;
+  claim: Record<string, any>;
+};
+
+type ClaimDraft = {
+  procedureCode: string;
+  procedureDesc: string;
+  allowedAmount: string;
+  amtCharged: string;
+  units: string;
+  memberAge: string;
+  memberGender: string;
+  memberId: string;
+  providerId: string;
+  serviceDate: string;
+  benefitType: string;
+  serviceCategoryName: string;
+  benefitCategoryName: string;
+};
+
+const claimFields: Array<{ key: keyof ClaimDraft; label: string; type?: string }> = [
+  { key: 'procedureCode', label: 'Procedure Code' },
+  { key: 'procedureDesc', label: 'Procedure Description' },
+  { key: 'allowedAmount', label: 'Allowed Amount', type: 'number' },
+  { key: 'amtCharged', label: 'Amount Charged', type: 'number' },
+  { key: 'units', label: 'Units', type: 'number' },
+  { key: 'memberAge', label: 'Member Age', type: 'number' },
+  { key: 'memberGender', label: 'Member Gender' },
+  { key: 'memberId', label: 'Member ID' },
+  { key: 'providerId', label: 'Provider ID' },
+  { key: 'serviceDate', label: 'Service Date', type: 'date' },
+  { key: 'benefitType', label: 'Benefit Type' },
+  { key: 'serviceCategoryName', label: 'Service Category' },
+  { key: 'benefitCategoryName', label: 'Benefit Category' },
+];
+
+const toClaimDraft = (claim: Record<string, any>): ClaimDraft => ({
+  procedureCode: String(claim.procedureCode ?? ''),
+  procedureDesc: String(claim.procedureDesc ?? ''),
+  allowedAmount: String(claim.allowedAmount ?? ''),
+  amtCharged: String(claim.amtCharged ?? ''),
+  units: String(claim.units ?? ''),
+  memberAge: String(claim.memberAge ?? ''),
+  memberGender: String(claim.memberGender ?? ''),
+  memberId: String(claim.memberId ?? ''),
+  providerId: String(claim.providerId ?? ''),
+  serviceDate: String(claim.serviceDate ?? ''),
+  benefitType: String(claim.benefitType ?? ''),
+  serviceCategoryName: String(claim.serviceCategoryName ?? ''),
+  benefitCategoryName: String(claim.benefitCategoryName ?? ''),
+});
+
+const toClaimPayload = (draft: ClaimDraft) => ({
+  ...draft,
+  allowedAmount: Number(draft.allowedAmount || 0),
+  amtCharged: Number(draft.amtCharged || 0),
+  units: Number(draft.units || 0),
+  memberAge: Number(draft.memberAge || 0),
+});
 
 export default function NewClaimScoring() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -16,6 +79,11 @@ export default function NewClaimScoring() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sampleClaims, setSampleClaims] = useState<SampleClaim[]>([]);
+  const [selectedSampleId, setSelectedSampleId] = useState('');
+  const [sampleLoading, setSampleLoading] = useState(true);
+  const [sampleModalOpen, setSampleModalOpen] = useState(false);
+  const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
   const scoredClaim = result?.claim;
   const scoredAnalysis = result?.analysis;
   const aiSummary = scoredAnalysis?.aiSummary;
@@ -58,24 +126,29 @@ export default function NewClaimScoring() {
       });
   };
 
-  const startManualProcessing = () => {
+  const startSampleProcessing = (draft: ClaimDraft) => {
     beginProcessing(api.createScoringJob({
       sourceType: 'manual',
-      claim: {
-        procedureCode: 'V2784',
-        procedureDesc: 'Premium Lens Addition',
-        allowedAmount: 300,
-        amtCharged: 750,
-        units: 1,
-        memberAge: 42,
-        memberGender: 'Female',
-        providerId: 'PRV-7121270',
-        serviceDate: new Date().toISOString().slice(0, 10),
-        benefitType: 'Lens',
-        serviceCategoryName: 'lens material',
-        benefitCategoryName: 'material',
-      },
+      claim: toClaimPayload(draft),
     }));
+  };
+
+  const openSelectedSample = () => {
+    const selected = sampleClaims.find((sample) => sample.id === selectedSampleId);
+    if (!selected) {
+      setUploadError('Choose a testcase before continuing.');
+      return;
+    }
+    setClaimDraft(toClaimDraft(selected.claim));
+    setSampleModalOpen(true);
+    setUploadError(null);
+  };
+
+  const proceedWithSample = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!claimDraft) return;
+    setSampleModalOpen(false);
+    startSampleProcessing(claimDraft);
   };
 
   const startFileProcessing = (file: File | null | undefined) => {
@@ -87,6 +160,18 @@ export default function NewClaimScoring() {
     event.preventDefault();
     startFileProcessing(event.dataTransfer.files?.[0]);
   };
+
+  useEffect(() => {
+    api.getSampleClaims()
+      .then((samples: SampleClaim[]) => {
+        setSampleClaims(samples);
+        setSelectedSampleId(samples[0]?.id || '');
+      })
+      .catch((error) => {
+        setUploadError(error instanceof Error ? error.message : 'Failed to fetch testcases.');
+      })
+      .finally(() => setSampleLoading(false));
+  }, []);
 
   useEffect(() => {
     if (step !== 'processing' || !jobId) return;
@@ -162,19 +247,41 @@ export default function NewClaimScoring() {
                 }}
               />
               
-              <div className="flex gap-4">
+              <div className="flex w-full max-w-2xl flex-col gap-4 md:flex-row md:items-end md:justify-center">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-6 py-3 rounded-md transition-colors shadow-[0_0_15px_rgba(8,145,178,0.3)]"
+                  className="h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-6 py-3 rounded-md transition-colors shadow-[0_0_15px_rgba(8,145,178,0.3)]"
                 >
                   BROWSE FILES
                 </button>
-                <button
-                  onClick={startManualProcessing}
-                  className="bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-bold text-xs px-6 py-3 rounded-md transition-colors flex items-center gap-2"
-                >
-                  <FileText className="w-4 h-4" /> USE SAMPLE CLAIM
-                </button>
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <label className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Testcase
+                  </label>
+                  <div className="flex min-w-0 gap-3">
+                    <select
+                      value={selectedSampleId}
+                      disabled={sampleLoading || sampleClaims.length === 0}
+                      onChange={(event) => setSelectedSampleId(event.target.value)}
+                      className="h-11 min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950/60 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:text-slate-500"
+                    >
+                      {sampleLoading && <option>Loading testcases...</option>}
+                      {!sampleLoading && sampleClaims.length === 0 && <option>No JSON testcases found</option>}
+                      {sampleClaims.map((sample) => (
+                        <option key={sample.id} value={sample.id}>
+                          {sample.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={openSelectedSample}
+                      disabled={sampleLoading || sampleClaims.length === 0}
+                      className="h-11 whitespace-nowrap bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 text-white font-bold text-xs px-5 rounded-md transition-colors flex items-center gap-2"
+                    >
+                      NEXT <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </GlassCard>
           </motion.div>
@@ -428,6 +535,83 @@ export default function NewClaimScoring() {
               </button>
             </div>
 
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sampleModalOpen && claimDraft && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.form
+              onSubmit={proceedWithSample}
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              className="w-full max-w-4xl"
+            >
+              <GlassCard className="max-h-[88vh] overflow-hidden p-0">
+                <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Review Testcase Input</h3>
+                      <p className="text-xs text-slate-400">Edit the claim fields before running the review.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSampleModalOpen(false)}
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-300 transition hover:bg-slate-800"
+                    aria-label="Close testcase input"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="max-h-[calc(88vh-145px)] overflow-y-auto px-6 py-5">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {claimFields.map((field) => (
+                      <label key={field.key} className="flex flex-col gap-2 text-left">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          {field.label}
+                        </span>
+                        <input
+                          type={field.type || 'text'}
+                          step={field.type === 'number' ? 'any' : undefined}
+                          value={claimDraft[field.key]}
+                          required={['procedureCode', 'allowedAmount', 'providerId'].includes(field.key)}
+                          onChange={(event) => setClaimDraft({ ...claimDraft, [field.key]: event.target.value })}
+                          className="h-11 rounded-md border border-slate-700 bg-slate-950/60 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-6 py-4 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSampleModalOpen(false)}
+                    className="h-11 rounded-md border border-slate-700 bg-slate-900 px-5 text-xs font-bold text-slate-300 transition hover:bg-slate-800"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex h-11 items-center justify-center gap-2 rounded-md bg-cyan-600 px-6 text-xs font-bold text-white shadow-[0_0_15px_rgba(8,145,178,0.3)] transition-colors hover:bg-cyan-500"
+                  >
+                    PROCEED <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </GlassCard>
+            </motion.form>
           </motion.div>
         )}
       </AnimatePresence>

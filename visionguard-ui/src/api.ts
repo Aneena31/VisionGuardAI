@@ -57,6 +57,7 @@ export const api = {
   getSystemStatus: () => request<any>('/visionguard/system/status'),
   getNotifications: () => request<any>('/visionguard/notifications'),
   markNotificationRead: (id: string) => request<any>(`/visionguard/notifications/${id}/read`, { method: 'POST' }),
+  getSampleClaims: () => request<any>('/visionguard/scoring/sample-claims'),
   createScoringJob: (payload: any) => request<any>('/visionguard/scoring/jobs', { method: 'POST', body: JSON.stringify(payload) }),
   createScoringJobFromFile: (file: File) => {
     const formData = new FormData();

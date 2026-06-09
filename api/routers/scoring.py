@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
@@ -13,10 +14,35 @@ from api.schemas.scoring import ScoringJobCreate
 from api.services import scoring_service
 from db.database import get_db
 from db.models import ScoringJob
-from typing import Optional
 
 
 router = APIRouter(prefix="/visionguard/scoring", tags=["scoring"])
+
+
+@router.get("/sample-claims")
+def list_sample_claims(request: Request):
+    testcase_dir = Path(__file__).resolve().parents[2] / "testcase"
+    if not testcase_dir.exists():
+        raise HTTPException(status_code=404, detail="Testcase folder was not found.")
+
+    samples = []
+    for path in sorted(testcase_dir.glob("*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            claim = payload[0] if isinstance(payload, list) else payload.get("claim", payload)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=422, detail=f"Could not load testcase {path.name}: {exc}") from exc
+
+        samples.append(
+            {
+                "id": path.stem,
+                "filename": path.name,
+                "label": path.stem.replace("_", " ").title(),
+                "claim": claim,
+            }
+        )
+
+    return make_response(samples, request.state.request_id)
 
 
 @router.post("/jobs")
