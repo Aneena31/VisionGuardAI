@@ -75,6 +75,7 @@ html.theme-light .bg-\[\#05070a\] {
 html.theme-light .bg-slate-950,
 html.theme-light .bg-slate-950\/40,
 html.theme-light .bg-slate-950\/50,
+html.theme-light .bg-slate-950\/60,
 html.theme-light .bg-slate-900,
 html.theme-light .bg-slate-900\/90,
 html.theme-light .bg-slate-900\/80,
@@ -187,4 +188,8 @@ html.theme-light .text-emerald-100 {
 
 html.theme-light .bg-slate-700 {
   background-color: #cbd5e1;
+}
+
+html.theme-light .testcase-input-surface {
+  background-color: #ffffff;
 }

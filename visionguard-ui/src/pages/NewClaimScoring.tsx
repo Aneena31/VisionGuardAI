@@ -651,7 +651,7 @@ export default function NewClaimScoring() {
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
               className="w-full max-w-4xl"
             >
-              <GlassCard className="max-h-[88vh] overflow-hidden p-0">
+              <GlassCard className="testcase-input-surface max-h-[88vh] overflow-hidden p-0">
                 <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-md border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
