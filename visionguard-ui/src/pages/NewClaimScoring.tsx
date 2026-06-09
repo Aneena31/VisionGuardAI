@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { FileText, Loader2, ShieldAlert, Activity, BrainCircuit, Users, Zap, ArrowRight, Mail, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
+import { buildProcessInsights } from '../processInsights';
 
 type Step = 'upload' | 'processing' | 'result';
 
@@ -164,6 +165,7 @@ export default function NewClaimScoring() {
   const clusterAssignment = scoredAnalysis?.clusterAssignment;
   const closestCase = clusterAssignment?.closestCase;
   const fraudScore = Number(scoredClaim?.fraudScore || 0);
+  const processInsights = buildProcessInsights(scoredAnalysis, scoredClaim);
   const selectedSample = sampleClaims.find((sample) => sample.id === selectedSampleId);
   const processingSectionRef = useRef<HTMLDivElement | null>(null);
   const resultsSectionRef = useRef<HTMLDivElement | null>(null);
@@ -449,13 +451,13 @@ export default function NewClaimScoring() {
               </GlassCard>
 
               <div className="lg:col-span-4 flex flex-col gap-4">
-                <GlassCard className="flex flex-col items-center justify-center p-8 relative overflow-hidden min-h-80 ring-1 ring-red-500/20 bg-slate-900/90">
+                <GlassCard className="flex flex-col items-center p-6 relative overflow-hidden min-h-[360px] ring-1 ring-red-500/20 bg-slate-900/90">
                   <div className="absolute w-64 h-64 rounded-full blur-[100px] opacity-20 pointer-events-none bg-red-500" />
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute top-6 mt-1">Review Priority</div>
-                  <div className="relative w-48 h-48 mt-6">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Review Priority</div>
+                  <div className="relative w-44 h-44 mt-4">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={[{ value: fraudScore }, { value: 100 - fraudScore }]} cx="50%" cy="50%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={90} dataKey="value" stroke="none">
+                        <Pie data={[{ value: fraudScore }, { value: 100 - fraudScore }]} cx="50%" cy="50%" startAngle={180} endAngle={0} innerRadius={64} outerRadius={82} dataKey="value" stroke="none">
                           <Cell fill="#ef4444" />
                           <Cell fill="rgba(255,255,255,0.05)" />
                         </Pie>
@@ -466,9 +468,16 @@ export default function NewClaimScoring() {
                       <div className="px-2 py-0.5 mt-2 text-xs font-bold bg-red-500/20 text-red-500 border border-red-500/30 rounded">{scoredClaim?.riskLevel || 'Unknown'} RISK</div>
                     </div>
                   </div>
-                  <div className="text-center w-full mt-4 z-10">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Likely Issue</div>
-                    <div className="text-white text-sm font-bold">{scoredClaim?.fraudType || 'No Significant Concern Found'}</div>
+                  <div className="w-full mt-2 z-10">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 text-center">Process Insights</div>
+                    <ul className="flex flex-wrap justify-center gap-2">
+                      {processInsights.map((insight, index) => (
+                        <li key={`${index}-${insight}`} className="flex max-w-full items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-xs leading-snug text-slate-200">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </GlassCard>
 

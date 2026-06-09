@@ -6,6 +6,7 @@ import { claims, clusters } from '../data';
 import { ArrowLeft, User, Stethoscope, Hash, ShieldAlert, Activity, BrainCircuit, Users, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
+import { buildProcessInsights } from '../processInsights';
 
 export default function ClaimInvestigationView() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function ClaimInvestigationView() {
   const claim = claimAnalysis?.claim || claims.find(c => c.id === id) || claims[0];
   const analysis = claimAnalysis?.analysis;
   const cluster = analysis?.clusterAssignment?.cluster || clusters.find(c => c.id === claim.clusterId);
+  const processInsights = buildProcessInsights(analysis, claim);
   const [expandedStage, setExpandedStage] = useState<number>(0);
 
   useEffect(() => {
@@ -354,7 +356,7 @@ export default function ClaimInvestigationView() {
 
         {/* Right Column: Final Score Gauge */}
         <div className="lg:col-span-3 space-y-6">
-          <GlassCard className="flex flex-col items-center justify-center p-6 relative overflow-hidden h-[360px] bg-slate-900/90 border-slate-800">
+          <GlassCard className="flex flex-col items-center justify-center p-6 relative overflow-hidden min-h-[460px] bg-slate-900/90 border-slate-800">
              <div className="absolute w-64 h-64 rounded-full blur-[100px] opacity-10 pointer-events-none" style={{ backgroundColor: getScoreColor(claim.fraudScore) }} />
              
              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute top-6 mt-1">Calculated AI Score</div>
@@ -378,9 +380,16 @@ export default function ClaimInvestigationView() {
                    </div>
                 </div>
              </div>
-             <div className="text-center w-full mt-2 z-10">
-               <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Detected Fraud Pattern</div>
-               <div className="text-white text-sm font-bold">{claim.fraudType || 'Standard Baseline'}</div>
+             <div className="w-full mt-2 z-10">
+               <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 text-center">Process Insights</div>
+               <ul className="space-y-2 text-left">
+                 {processInsights.map((insight, index) => (
+                   <li key={`${index}-${insight}`} className="flex gap-2 text-xs leading-snug text-slate-200">
+                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+                     <span>{insight}</span>
+                   </li>
+                 ))}
+               </ul>
              </div>
           </GlassCard>
         </div>

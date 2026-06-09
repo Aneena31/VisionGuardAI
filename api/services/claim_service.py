@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from api.services.historical_data_service import get_historical_data
 from db.models import Claim, Notification, ProviderGold
 from pipeline import config
+from pipeline.rules import RULE_COLUMNS
 
 
 CLUSTER_DEFINITIONS = {
@@ -182,10 +183,26 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None, 
     provider_pattern_score = _score_value(getattr(claim, "provider_stat_score_norm", None), claim.provider_stat_score)
     ml_pattern_score = _score_value(getattr(claim, "ml_anomaly_score_norm", None), claim.ml_anomaly_score)
     closest_case = _closest_case_for_claim(claim, historical_data)
+    triggered_rules = _triggered_rules(claim.rule_narrative)
+    total_rules = len(RULE_COLUMNS)
+    failed_rules = min(total_rules, max(0, int(claim.rule_flag_count or len(triggered_rules))))
+    passed_rules = max(0, total_rules - failed_rules)
+    cluster_matched = (claim.cluster_id or "CL-00") != "CL-00"
+    process_insights = _process_insights(
+        claim,
+        triggered_rules,
+        total_rules,
+        passed_rules,
+        failed_rules,
+        claim_pattern_score,
+        provider_pattern_score,
+        ml_pattern_score,
+    )
     return {
         "claim": claim_summary(claim),
         "analysis": {
             "pipeline": _pipeline_context(claim),
+            "processInsights": process_insights,
             "member": {
                 "memberId": claim.member_id,
                 "age": claim.member_age,
@@ -209,9 +226,12 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None, 
             "rulesAnalysis": {
                 "engine": "Deterministic Engine",
                 "status": "triggered" if (claim.rule_flag_count or 0) > 0 else "clear",
+                "totalRules": total_rules,
+                "passedRules": passed_rules,
+                "failedRules": failed_rules,
                 "ruleScore": claim.rule_score_norm or 0,
                 "severity": claim.final_risk_level or "Low",
-                "triggeredRules": _triggered_rules(claim.rule_narrative),
+                "triggeredRules": triggered_rules,
             },
             "statisticalAnalysis": {
                 "claimAmountZScore": claim.z_allowed_amount or 0,
@@ -232,7 +252,7 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None, 
             },
             "clusterAssignment": {
                 "clusterId": claim.cluster_id or "CL-00",
-                "matched": (claim.cluster_id or "CL-00") != "CL-00",
+                "matched": cluster_matched,
                 "confidence": min(0.99, max(0.0, (claim.final_combined_score or 0) / 100)),
                 "cluster": cluster,
                 "closestCase": closest_case,
@@ -320,6 +340,46 @@ def _triggered_rules(rule_narrative: Optional[str]) -> list[dict]:
             code, message = part.split(":", 1)
             items.append({"ruleCode": code.strip(), "severity": "high", "message": message.strip()})
     return items
+
+
+def _process_insights(
+    claim: Claim,
+    triggered_rules: list[dict],
+    total_rules: int,
+    passed_rules: int,
+    failed_rules: int,
+    claim_pattern_score: float,
+    provider_pattern_score: float,
+    ml_pattern_score: float,
+) -> list[str]:
+    insights = []
+
+    if failed_rules:
+        insights.append(f"{failed_rules} rule violations found")
+    else:
+        insights.append("No rule violations")
+
+    if claim_pattern_score >= 70 and provider_pattern_score >= 70:
+        insights.append("Unusual claim and provider billing")
+    elif claim_pattern_score >= 70:
+        insights.append("Unusual claim billing")
+    elif provider_pattern_score >= 70:
+        insights.append("Unusual provider billing")
+    elif claim_pattern_score >= 40 or provider_pattern_score >= 40:
+        insights.append("Moderate billing variation")
+    else:
+        insights.append("Normal billing patterns")
+
+    if ml_pattern_score >= 75:
+        insights.append("High anomaly concern")
+    elif ml_pattern_score >= 50:
+        insights.append("Moderate anomaly concern")
+    elif ml_pattern_score >= 25:
+        insights.append("Low anomaly concern")
+    else:
+        insights.append("No anomaly concern")
+
+    return insights
 
 
 def _json_or_default(raw: Optional[str], default: Any) -> Any:
