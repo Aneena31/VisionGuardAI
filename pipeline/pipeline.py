@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import json
 from typing import Optional
 
 import pandas as pd
@@ -67,12 +68,15 @@ def run_clean_batch(df: pd.DataFrame):
     return df, provider_gold, artifacts
 
 
-def run_single(claim_dict: dict, artifacts: dict, population_stats: dict) -> dict:
+def run_single(claim_dict: dict, artifacts: dict, population_stats: dict, historical_df: Optional[pd.DataFrame] = None) -> dict:
     """Run the single-claim scoring pipeline using cached artifacts."""
     claim = ingest.clean_single(claim_dict)
     claim = rules.apply_rules_single(claim)
     claim = stats.score_single_claim(claim, population_stats or {})
     claim.update(ml.score_single(claim, artifacts))
     claim = scoring.apply_final_scoring_single(claim)
+    closest_claim = similarity.find_closest_claim(claim, historical_df)
+    claim["Closest_Similar_Claim"] = closest_claim
+    claim["Similar_Claim_Ids"] = json.dumps([closest_claim["id"]]) if closest_claim else json.dumps([])
     claim["ai_summary"] = ai_summary.generate_for_claim(claim)
     return claim

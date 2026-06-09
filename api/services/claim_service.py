@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from api.services.historical_data_service import get_historical_data
 from db.models import Claim, Notification, ProviderGold
+from pipeline import config
 
 
 CLUSTER_DEFINITIONS = {
@@ -115,7 +116,7 @@ def get_claim_analysis(db: Session, claim_id: str) -> Optional[dict]:
     if not claim:
         return None
     provider = data.providers_by_id.get(claim.provider_id) if claim.provider_id else None
-    return build_claim_analysis(claim, provider)
+    return build_claim_analysis(claim, provider, data)
 
 
 def flag_claim(db: Session, claim_id: str) -> Optional[dict]:
@@ -173,10 +174,14 @@ def claim_summary(claim: Claim) -> dict:
     }
 
 
-def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None) -> dict:
+def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None, historical_data: Any = None) -> dict:
     ai_summary = _json_or_default(claim.ai_summary, {})
     cluster = CLUSTER_DEFINITIONS.get(claim.cluster_id or "CL-00", CLUSTER_DEFINITIONS["CL-00"]).copy()
-    cluster["claimCount"] = 0
+    cluster["claimCount"] = _cluster_claim_count(historical_data, claim.cluster_id or "CL-00")
+    claim_pattern_score = _score_value(getattr(claim, "claim_stat_score_norm", None), claim.claim_stat_score)
+    provider_pattern_score = _score_value(getattr(claim, "provider_stat_score_norm", None), claim.provider_stat_score)
+    ml_pattern_score = _score_value(getattr(claim, "ml_anomaly_score_norm", None), claim.ml_anomaly_score)
+    closest_case = _closest_case_for_claim(claim, historical_data)
     return {
         "claim": claim_summary(claim),
         "analysis": {
@@ -211,20 +216,26 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None) 
             "statisticalAnalysis": {
                 "claimAmountZScore": claim.z_allowed_amount or 0,
                 "providerZScore": getattr(claim, "z_prov_allowed", claim.z_allowed_amount) or 0,
-                "narrative": claim.stat_narrative or "",
+                "claimPatternScore": claim_pattern_score,
+                "providerPatternScore": provider_pattern_score,
+                "claimPatternLevel": _history_level(claim_pattern_score),
+                "providerPatternLevel": _history_level(provider_pattern_score),
+                "narrative": _business_stat_narrative(claim, claim_pattern_score, provider_pattern_score),
                 "providerPercentile": min(100, round((claim.provider_stat_score or 0), 1)),
             },
             "mlAnalysis": {
-                "anomalyScore": claim.ml_anomaly_score_norm or 0,
+                "anomalyScore": ml_pattern_score,
                 "isolationForestScore": claim.if_score_norm or 0,
                 "pcaErrorScore": claim.pca_score_norm or 0,
-                "modelSummary": claim.ml_anomaly_narrative or "",
+                "concernLevel": _score_concern_label(ml_pattern_score),
+                "modelSummary": _business_ml_narrative(claim),
             },
             "clusterAssignment": {
                 "clusterId": claim.cluster_id or "CL-00",
                 "matched": (claim.cluster_id or "CL-00") != "CL-00",
                 "confidence": min(0.99, max(0.0, (claim.final_combined_score or 0) / 100)),
                 "cluster": cluster,
+                "closestCase": closest_case,
             },
             "aiSummary": ai_summary,
             "actions": {"canDownloadReport": True, "canFlagForSiu": True, "canAssignAnalyst": True},
@@ -234,6 +245,7 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None) 
 
 def build_single_claim_analysis(claim_data: dict) -> dict:
     claim = _ad_hoc_claim(claim_data)
+    claim.closest_similar_claim = claim_data.get("Closest_Similar_Claim")
     return build_claim_analysis(claim, None)
 
 
@@ -259,6 +271,8 @@ def _ad_hoc_claim(data: dict) -> Claim:
         rule_score_total=float(data.get("Rule_Score_Total", 0) or 0),
         rule_narrative=data.get("Rule_Narrative", ""),
         z_allowed_amount=float(data.get("Z_AllowedAmount", 0) or 0),
+        z_units=float(data.get("Z_Units", 0) or 0),
+        z_billed_to_allowed=float(data.get("Z_BilledToAllowed", 0) or 0),
         claim_stat_score=float(data.get("Claim_Stat_Score", 0) or 0),
         provider_stat_score=float(data.get("Provider_Stat_Score", 0) or 0),
         stat_narrative=data.get("Stat_Narrative", ""),
@@ -277,6 +291,7 @@ def _ad_hoc_claim(data: dict) -> Claim:
         final_narrative=data.get("Final_Narrative", ""),
         ai_summary=json.dumps(data.get("ai_summary", {})),
         cluster_id=data.get("cluster_id", "CL-00"),
+        similar_claim_ids=data.get("Similar_Claim_Ids", "[]"),
         status=data.get("status", "Pending"),
     )
     claim.z_prov_allowed = float(data.get("Z_Prov_Allowed", 0) or 0)
@@ -310,10 +325,140 @@ def _triggered_rules(rule_narrative: Optional[str]) -> list[dict]:
 def _json_or_default(raw: Optional[str], default: Any) -> Any:
     if not raw:
         return default
+    if not isinstance(raw, str):
+        return raw
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         return default
+
+
+def _score_value(*values: Any) -> float:
+    for value in values:
+        try:
+            if value is None:
+                continue
+            return min(100.0, max(0.0, round(float(value or 0), 1)))
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def _history_level(score: float) -> str:
+    if score >= 70:
+        return "Very unusual"
+    if score >= 40:
+        return "Somewhat unusual"
+    return "Typical"
+
+
+def _score_concern_label(score: float) -> str:
+    if score >= 75:
+        return "High concern"
+    if score >= 50:
+        return "Needs review"
+    if score >= 25:
+        return "Watch"
+    return "Low concern"
+
+
+def _business_stat_narrative(claim: Claim, claim_score: float, provider_score: float) -> str:
+    signals = []
+    _add_history_signal(signals, claim.z_allowed_amount, "Allowed amount", "historical claims")
+    _add_history_signal(signals, getattr(claim, "z_billed_to_allowed", 0), "Billed-to-allowed ratio", "historical claims")
+    _add_history_signal(signals, getattr(claim, "z_units", 0), "Units billed", "historical claims")
+    _add_history_signal(signals, getattr(claim, "z_prov_allowed", 0), "Provider allowed amount behavior", "peer providers")
+
+    if signals:
+        return " ".join(signals)
+    if claim_score >= 70:
+        return "The overall claim billing profile is unusual compared with historical claims."
+    if provider_score >= 70:
+        return "The provider's billing profile is unusual compared with peer providers."
+    if claim_score >= 40 or provider_score >= 40:
+        return "The claim or provider has some differences from prior patterns, but not enough to make this a high-concern historical match."
+    return "The claim and provider look consistent with expected historical billing patterns."
+
+
+def _add_history_signal(signals: list[str], value: Any, label: str, comparison_group: str) -> None:
+    try:
+        numeric_value = float(value or 0)
+    except (TypeError, ValueError):
+        return
+    if abs(numeric_value) < config.NARRATIVE_ZSCORE_THRESHOLD:
+        return
+    direction = "higher" if numeric_value > 0 else "lower"
+    signals.append(f"{label} is {direction} than expected for {comparison_group}.")
+
+
+def _business_ml_narrative(claim: Claim) -> str:
+    score = _score_value(getattr(claim, "ml_anomaly_score_norm", None), claim.ml_anomaly_score)
+    payment_score = _score_value(claim.if_score_norm)
+    detail_score = _score_value(claim.pca_score_norm)
+    procedure = claim.procedure_code or "this procedure"
+    allowed = claim.amt_allowed or 0
+    ratio = claim.billed_amount_to_allowed_ratio or 0
+    lead = f"Pattern review is {_concern_phrase(score)} for {procedure}: overall concern is {score:.1f}/100."
+    detail = (
+        f" Payment behavior is {_concern_phrase(payment_score)} and claim detail consistency is "
+        f"{_concern_phrase(detail_score)}. Allowed amount is ${allowed:,.2f} and billed-to-allowed ratio is {ratio:.2f}."
+    )
+    if score >= 70:
+        return lead + detail + " The combination is less consistent with prior claim behavior and should be manually reviewed."
+    if score >= 40:
+        return lead + detail + " The claim has some differences from prior claim behavior and is worth a closer look."
+    return lead + detail + " The claim remains consistent with prior claim behavior."
+
+
+def _concern_phrase(score: float) -> str:
+    label = _score_concern_label(score)
+    if label == "Watch":
+        return "on watch"
+    return label.lower()
+
+
+def _cluster_claim_count(historical_data: Any, cluster_id: str) -> int:
+    claims = getattr(historical_data, "claims", None)
+    if not claims:
+        return 0
+    return sum(1 for item in claims if (item.cluster_id or "CL-00") == cluster_id)
+
+
+def _closest_case_for_claim(claim: Claim, historical_data: Any) -> Optional[dict]:
+    payload = getattr(claim, "closest_similar_claim", None)
+    if isinstance(payload, dict):
+        return payload
+
+    similar_ids = _json_or_default(claim.similar_claim_ids, [])
+    if not similar_ids:
+        return None
+    claims_by_id = getattr(historical_data, "claims_by_id", {}) if historical_data else {}
+    for similar_id in similar_ids:
+        candidate = claims_by_id.get(str(similar_id))
+        if candidate and candidate.id != claim.id:
+            return _similar_case_summary(candidate)
+    return None
+
+
+def _similar_case_summary(claim: Claim) -> dict:
+    return {
+        "id": claim.id,
+        "providerId": claim.provider_id,
+        "providerName": claim.provider_name or claim.provider_id,
+        "procedureCode": claim.procedure_code,
+        "procedureDesc": claim.procedure_desc or "",
+        "allowedAmount": round(claim.amt_allowed or 0, 2),
+        "billedAmount": round(claim.amt_charged or 0, 2),
+        "billedToAllowedRatio": round(claim.billed_amount_to_allowed_ratio or 0, 2),
+        "fraudScore": round(claim.final_combined_score or 0, 1),
+        "riskLevel": claim.final_risk_level or "Low",
+        "issueType": claim.final_fraud_type or "No significant issue",
+        "clusterId": claim.cluster_id or "CL-00",
+        "date": claim.service_date.isoformat() if claim.service_date else None,
+        "status": claim.status or "Pending",
+        "similarityScore": None,
+        "matchReason": "closest processed historical claim profile",
+    }
 
 
 def _matches_claim(

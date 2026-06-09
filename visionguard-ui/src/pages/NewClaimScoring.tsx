@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlassCard } from '../components/ui';
 import { motion, AnimatePresence } from 'motion/react';
-import { UploadCloud, FileText, Loader2, ShieldAlert, Activity, BrainCircuit, Users, ChevronDown, ChevronRight, Zap, ArrowRight, X } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, ShieldAlert, Activity, BrainCircuit, Users, ChevronDown, ChevronRight, Zap, ArrowRight, X, Mail, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 
@@ -70,8 +70,60 @@ const toClaimPayload = (draft: ClaimDraft) => ({
   memberAge: Number(draft.memberAge || 0),
 });
 
+const technicalNarrativePattern = /\b(SD|standard deviation|population mean|z-?score|Isolation Forest|PCA|reconstruction|ML anomaly)\b/i;
+
+const historyConcernLabel = (value: number) => {
+  if (value >= 70) return 'Very unusual';
+  if (value >= 40) return 'Somewhat unusual';
+  return 'Typical';
+};
+
+const scoreConcernLabel = (value: number) => {
+  if (value >= 75) return 'High concern';
+  if (value >= 50) return 'Needs review';
+  if (value >= 25) return 'Watch';
+  return 'Low concern';
+};
+
+const businessHistoricalNarrative = (rawNarrative: unknown, claimScore: number, providerScore: number) => {
+  const narrative = typeof rawNarrative === 'string' ? rawNarrative.trim() : '';
+  if (narrative && !technicalNarrativePattern.test(narrative)) return narrative;
+  const claimLabel = historyConcernLabel(claimScore).toLowerCase();
+  const providerLabel = historyConcernLabel(providerScore).toLowerCase();
+  if (claimScore >= 70 && providerScore >= 70) {
+    return 'Both the submitted claim and the provider billing profile are unusual compared with prior claim activity.';
+  }
+  if (claimScore >= 70) {
+    return 'The submitted claim billing profile is unusual compared with prior claims with similar billing characteristics.';
+  }
+  if (providerScore >= 70) {
+    return 'The provider billing profile is unusual compared with peer providers.';
+  }
+  if (claimScore >= 40 || providerScore >= 40) {
+    return `The claim is ${claimLabel} and the provider is ${providerLabel}; this is worth a business review but is not a high-concern historical mismatch.`;
+  }
+  return 'The claim and provider look consistent with expected historical billing patterns.';
+};
+
+const businessPatternNarrative = (rawNarrative: unknown, patternScore: number) => {
+  const narrative = typeof rawNarrative === 'string' ? rawNarrative.trim() : '';
+  if (narrative && !technicalNarrativePattern.test(narrative)) return narrative;
+  if (patternScore >= 75) {
+    return 'The overall pattern score is high concern, which means the claim does not line up well with prior claim behavior and should be reviewed.';
+  }
+  if (patternScore >= 50) {
+    return 'The overall pattern score needs review because the claim has noticeable differences from prior claim behavior.';
+  }
+  if (patternScore >= 25) {
+    return 'The overall pattern score is on watch, with some differences from prior claim behavior.';
+  }
+  return 'The overall pattern score is low concern and remains consistent with prior claim behavior.';
+};
+
+const formatCurrency = (value: unknown) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value || 0));
+
 export default function NewClaimScoring() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [step, setStep] = useState<Step>('upload');
   const [processingProgress, setProcessingProgress] = useState(0);
   const [activeAnalysis, setActiveAnalysis] = useState('Preparing claim review...');
@@ -84,31 +136,25 @@ export default function NewClaimScoring() {
   const [sampleLoading, setSampleLoading] = useState(true);
   const [sampleModalOpen, setSampleModalOpen] = useState(false);
   const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
+  const [assignmentState, setAssignmentState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const scoredClaim = result?.claim;
   const scoredAnalysis = result?.analysis;
   const aiSummary = scoredAnalysis?.aiSummary;
   const triggeredRules = scoredAnalysis?.rulesAnalysis?.triggeredRules || [];
-  const claimZScore = Number(scoredAnalysis?.statisticalAnalysis?.claimAmountZScore || 0);
-  const providerZScore = Number(scoredAnalysis?.statisticalAnalysis?.providerZScore || 0);
-  const isolationForestScore = Number(scoredAnalysis?.mlAnalysis?.isolationForestScore || 0);
-  const pcaErrorScore = Number(scoredAnalysis?.mlAnalysis?.pcaErrorScore || 0);
-  const mlAnomalyScore = Number(scoredAnalysis?.mlAnalysis?.anomalyScore || 0);
+  const statisticalAnalysis = scoredAnalysis?.statisticalAnalysis || {};
+  const mlAnalysis = scoredAnalysis?.mlAnalysis || {};
+  const claimPatternScore = Number(statisticalAnalysis?.claimPatternScore ?? 0);
+  const providerPatternScore = Number(statisticalAnalysis?.providerPatternScore ?? 0);
+  const claimHistoryLevel = statisticalAnalysis?.claimPatternLevel || historyConcernLabel(claimPatternScore);
+  const providerHistoryLevel = statisticalAnalysis?.providerPatternLevel || historyConcernLabel(providerPatternScore);
+  const historicalNarrative = businessHistoricalNarrative(statisticalAnalysis?.narrative, claimPatternScore, providerPatternScore);
+  const isolationForestScore = Number(mlAnalysis?.isolationForestScore || 0);
+  const pcaErrorScore = Number(mlAnalysis?.pcaErrorScore || 0);
+  const mlAnomalyScore = Number(mlAnalysis?.anomalyScore || 0);
+  const patternNarrative = businessPatternNarrative(mlAnalysis?.modelSummary, mlAnomalyScore);
   const clusterAssignment = scoredAnalysis?.clusterAssignment;
+  const closestCase = clusterAssignment?.closestCase;
   const fraudScore = Number(scoredClaim?.fraudScore || 0);
-
-  const concernLabel = (value: number) => {
-    const absolute = Math.abs(value);
-    if (absolute >= 2.5) return 'Very unusual';
-    if (absolute >= 1.5) return 'Somewhat unusual';
-    return 'Typical';
-  };
-
-  const scoreConcernLabel = (value: number) => {
-    if (value >= 75) return 'High concern';
-    if (value >= 50) return 'Needs review';
-    if (value >= 25) return 'Watch';
-    return 'Low concern';
-  };
 
   const beginProcessing = (jobPromise: Promise<any>) => {
     setStep('processing');
@@ -117,6 +163,7 @@ export default function NewClaimScoring() {
     setJobId(null);
     setResult(null);
     setUploadError(null);
+    setAssignmentState('idle');
     jobPromise
       .then((job) => setJobId(job.jobId))
       .catch((error) => {
@@ -151,14 +198,15 @@ export default function NewClaimScoring() {
     startSampleProcessing(claimDraft);
   };
 
-  const startFileProcessing = (file: File | null | undefined) => {
-    if (!file) return;
-    beginProcessing(api.createScoringJobFromFile(file));
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    startFileProcessing(event.dataTransfer.files?.[0]);
+  const sendToInvestigationTeam = async () => {
+    if (!jobId || assignmentState === 'sending' || assignmentState === 'sent') return;
+    setAssignmentState('sending');
+    try {
+      await api.assignScoringJob(jobId);
+      setAssignmentState('sent');
+    } catch {
+      setAssignmentState('error');
+    }
   };
 
   useEffect(() => {
@@ -224,36 +272,18 @@ export default function NewClaimScoring() {
             <GlassCard
               className="p-12 flex flex-col items-center justify-center border-dashed border-2 border-slate-700 bg-slate-900/40 hover:border-cyan-500/50 hover:bg-slate-800/50 transition-all group"
               onDragOver={(event) => event.preventDefault()}
-              onDrop={handleDrop}
             >
               <div className="w-20 h-20 bg-slate-900/60 border border-slate-700 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <UploadCloud className="w-10 h-10 text-cyan-400 group-hover:text-cyan-300" />
               </div>
-              <h3 className="text-xl font-medium text-white mb-2">Upload Claim File</h3>
-              <p className="text-slate-400 text-sm mb-8 text-center max-w-sm">Upload a claim file or use a sample claim to see the review outcome.</p>
+              <h3 className="text-xl font-medium text-white mb-2">Select Testcase Claim</h3>
+              <p className="text-slate-400 text-sm mb-8 text-center max-w-sm">Choose a testcase claim, review the input fields, then run the claim review.</p>
               {uploadError && (
                 <div className="mb-5 max-w-md rounded border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-200">
                   {uploadError}
                 </div>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.json"
-                className="hidden"
-                onChange={(event) => {
-                  startFileProcessing(event.target.files?.[0]);
-                  event.currentTarget.value = '';
-                }}
-              />
-              
-              <div className="flex w-full max-w-2xl flex-col gap-4 md:flex-row md:items-end md:justify-center">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-6 py-3 rounded-md transition-colors shadow-[0_0_15px_rgba(8,145,178,0.3)]"
-                >
-                  BROWSE FILES
-                </button>
+              <div className="flex w-full max-w-xl flex-col gap-4 md:flex-row md:items-end md:justify-center">
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <label className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     Testcase
@@ -276,9 +306,9 @@ export default function NewClaimScoring() {
                     <button
                       onClick={openSelectedSample}
                       disabled={sampleLoading || sampleClaims.length === 0}
-                      className="h-11 whitespace-nowrap bg-slate-800 border border-slate-700 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 text-white font-bold text-xs px-5 rounded-md transition-colors flex items-center gap-2"
+                      className="h-11 whitespace-nowrap bg-emerald-600 border border-emerald-400/30 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 text-white font-bold text-xs px-5 rounded-md transition-colors shadow-[0_0_15px_rgba(5,150,105,0.3)] flex items-center gap-2"
                     >
-                      NEXT <ArrowRight className="w-4 h-4" />
+                      PROCEED <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -385,7 +415,7 @@ export default function NewClaimScoring() {
                      </div>
                      <div>
                        <h3 className="font-bold text-white text-sm">Historical Comparison</h3>
-                       <p className="text-xs text-slate-400">Claim is {concernLabel(claimZScore).toLowerCase()} | Provider is {concernLabel(providerZScore).toLowerCase()}</p>
+                       <p className="text-xs text-slate-400">Claim is {String(claimHistoryLevel).toLowerCase()} | Provider is {String(providerHistoryLevel).toLowerCase()}</p>
                      </div>
                    </div>
                    {expandedStage === 1 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -393,17 +423,19 @@ export default function NewClaimScoring() {
                  <AnimatePresence>
                    {expandedStage === 1 && (
                      <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
-                       <div className="p-6 border-t border-slate-800/50 bg-slate-900/40 grid grid-cols-2 gap-4">
+                       <div className="p-6 border-t border-slate-800/50 bg-slate-900/40 grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
-                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Claim Amount vs Similar Claims</div>
-                         <div className="text-3xl font-display font-bold text-cyan-400">{concernLabel(claimZScore)}</div>
+                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Claim Billing vs History</div>
+                           <div className="text-3xl font-display font-bold text-cyan-400">{claimHistoryLevel}</div>
+                           <div className="mt-1 text-[11px] font-medium text-slate-500">Concern {Math.round(claimPatternScore)}/100</div>
                          </div>
                          <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Provider Billing vs Peers</div>
-                         <div className="text-3xl font-display font-bold text-cyan-400">{concernLabel(providerZScore)}</div>
+                           <div className="text-3xl font-display font-bold text-cyan-400">{providerHistoryLevel}</div>
+                           <div className="mt-1 text-[11px] font-medium text-slate-500">Concern {Math.round(providerPatternScore)}/100</div>
                          </div>
-                         <div className="col-span-2 text-xs text-slate-400 leading-relaxed mt-2 p-3 bg-slate-900 rounded border border-slate-800">
-                           <strong className="text-white">What this means:</strong> {scoredAnalysis?.statisticalAnalysis?.narrative || 'This claim and provider look typical compared with prior claims.'}
+                         <div className="md:col-span-2 text-xs text-slate-400 leading-relaxed mt-2 p-3 bg-slate-900 rounded border border-slate-800">
+                           <strong className="text-white">What this means:</strong> {historicalNarrative}
                          </div>
                        </div>
                      </motion.div>
@@ -420,7 +452,7 @@ export default function NewClaimScoring() {
                      </div>
                      <div>
                        <h3 className="font-bold text-white text-sm">Unusual Pattern Review</h3>
-                       <p className="text-xs text-slate-400">{scoreConcernLabel(mlAnomalyScore)} based on past claim behavior</p>
+                       <p className="text-xs text-slate-400">{scoreConcernLabel(mlAnomalyScore)} based on prior claim behavior</p>
                      </div>
                    </div>
                    {expandedStage === 2 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -429,18 +461,23 @@ export default function NewClaimScoring() {
                    {expandedStage === 2 && (
                      <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
                        <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
-                         <div className="grid grid-cols-2 gap-4 mb-4">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Payment Pattern</div>
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Overall Pattern Concern</div>
+                             <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(mlAnomalyScore)}</div>
+                             <div className="mt-1 text-[11px] font-medium text-slate-500">Score {Math.round(mlAnomalyScore)}/100</div>
+                           </div>
+                           <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Payment Behavior</div>
                              <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(isolationForestScore)}</div>
                            </div>
                            <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Claim Detail Pattern</div>
+                             <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Claim Detail Consistency</div>
                              <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(pcaErrorScore)}</div>
                            </div>
                          </div>
                          <div className="text-xs text-slate-400 leading-relaxed p-3 bg-slate-900 rounded border border-slate-800">
-                           <strong className="text-white">Pattern Summary:</strong> {scoredAnalysis?.mlAnalysis?.modelSummary || 'The claim pattern is within the expected range.'}
+                           <strong className="text-white">Pattern Summary:</strong> {patternNarrative}
                          </div>
                        </div>
                      </motion.div>
@@ -448,7 +485,7 @@ export default function NewClaimScoring() {
                  </AnimatePresence>
                </GlassCard>
 
-               {/* Step 4: Similar case type */}
+               {/* Step 4: Closest similar case */}
                <GlassCard className="p-0 overflow-hidden ring-1 ring-emerald-500/10">
                  <div className="px-6 py-4 flex items-center justify-between cursor-pointer bg-slate-900/60" onClick={() => setExpandedStage(3)}>
                    <div className="flex items-center gap-4">
@@ -456,8 +493,8 @@ export default function NewClaimScoring() {
                        <Users className="w-4 h-4" />
                      </div>
                      <div>
-                       <h3 className="font-bold text-white text-sm">Similar Case Type</h3>
-                       <p className="text-xs text-slate-400">{clusterAssignment?.matched ? 'Matches a known issue type' : 'No known issue type matched'}</p>
+                       <h3 className="font-bold text-white text-sm">Closest Similar Case</h3>
+                       <p className="text-xs text-slate-400">{closestCase ? `Matched to ${closestCase.id} after scoring` : 'No processed historical match found'}</p>
                      </div>
                    </div>
                    {expandedStage === 3 ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
@@ -466,16 +503,46 @@ export default function NewClaimScoring() {
                    {expandedStage === 3 && (
                      <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
                        <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
-                         <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                           <div className="flex justify-between items-center mb-2">
-                             <span className="font-mono text-emerald-400 text-xs px-2 py-1 bg-emerald-500/20 rounded border border-emerald-500/30">{clusterAssignment?.clusterId || 'CL-00'}</span>
-                             <span className="text-xs text-slate-400">Based on the likely issue type</span>
+                         {closestCase ? (
+                           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                               <span className="font-mono text-emerald-400 text-xs px-2 py-1 bg-emerald-500/20 rounded border border-emerald-500/30 w-fit">{closestCase.id}</span>
+                               <span className="text-xs text-slate-400">
+                                 {closestCase.similarityScore != null ? `${Math.round(closestCase.similarityScore)}% profile match` : 'Processed historical match'}
+                               </span>
+                             </div>
+                             <h4 className="text-white font-medium text-sm mt-3 mb-1">
+                               {closestCase.procedureCode || 'N/A'} {closestCase.procedureDesc ? `- ${closestCase.procedureDesc}` : ''}
+                             </h4>
+                             <p className="text-xs text-emerald-100 mb-4">{closestCase.matchReason || 'Closest processed historical claim profile.'}</p>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                               <div className="rounded border border-emerald-500/20 bg-slate-950/40 p-3">
+                                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Provider</div>
+                                 <div className="mt-1 text-slate-200">{closestCase.providerName || closestCase.providerId || 'N/A'}</div>
+                               </div>
+                               <div className="rounded border border-emerald-500/20 bg-slate-950/40 p-3">
+                                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Allowed Amount</div>
+                                 <div className="mt-1 text-slate-200">{formatCurrency(closestCase.allowedAmount)}</div>
+                               </div>
+                               <div className="rounded border border-emerald-500/20 bg-slate-950/40 p-3">
+                                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Prior Review Priority</div>
+                                 <div className="mt-1 text-slate-200">{closestCase.riskLevel || 'Low'} ({Math.round(Number(closestCase.fraudScore || 0))}/100)</div>
+                               </div>
+                               <div className="rounded border border-emerald-500/20 bg-slate-950/40 p-3">
+                                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Closest Case Issue</div>
+                                 <div className="mt-1 text-slate-200">{closestCase.issueType || clusterAssignment?.cluster?.name || 'No significant issue'}</div>
+                               </div>
+                             </div>
+                             <div className="mt-4 border-t border-emerald-500/20 pt-3 text-xs text-emerald-100">
+                               <span className="font-semibold text-white">Known issue type:</span> {clusterAssignment?.cluster?.name || 'N/A'}
+                               {clusterAssignment?.cluster?.riskCharacteristics ? ` - ${clusterAssignment?.cluster?.riskCharacteristics}` : ''}
+                             </div>
                            </div>
-                           <h4 className="text-white font-medium text-sm mb-1">{clusterAssignment?.cluster?.name || 'N/A'}</h4>
-                           <p className="text-xs text-emerald-100">
-                             {clusterAssignment?.cluster?.riskCharacteristics || 'No similar case type was found.'}
-                           </p>
-                         </div>
+                         ) : (
+                           <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-lg text-sm text-slate-400">
+                             No closest historical case was returned for this scored claim.
+                           </div>
+                         )}
                        </div>
                      </motion.div>
                    )}
@@ -530,8 +597,38 @@ export default function NewClaimScoring() {
                  </div>
               </GlassCard>
 
-              <button onClick={() => jobId && api.assignScoringJob(jobId)} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs py-4 rounded-md transition-all shadow-[0_0_15px_rgba(8,145,178,0.3)]">
-                SEND TO INVESTIGATION TEAM
+              <button
+                onClick={sendToInvestigationTeam}
+                disabled={!jobId || assignmentState === 'sending' || assignmentState === 'sent'}
+                className={`w-full flex h-12 items-center justify-center gap-2 rounded-md text-xs font-bold text-white shadow-[0_0_15px_rgba(8,145,178,0.3)] transition-all disabled:cursor-not-allowed ${
+                  assignmentState === 'sent'
+                    ? 'bg-emerald-600 shadow-[0_0_15px_rgba(5,150,105,0.3)]'
+                    : assignmentState === 'error'
+                      ? 'bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(220,38,38,0.25)]'
+                      : 'bg-cyan-600 hover:bg-cyan-500'
+                }`}
+              >
+                {assignmentState === 'sending' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    SENDING EMAIL...
+                  </>
+                ) : assignmentState === 'sent' ? (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    EMAIL SENT TO INVESTIGATION TEAM
+                  </>
+                ) : assignmentState === 'error' ? (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    EMAIL FAILED - TRY AGAIN
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    SEND TO INVESTIGATION TEAM
+                  </>
+                )}
               </button>
             </div>
 

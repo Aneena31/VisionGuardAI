@@ -4,11 +4,13 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import pandas as pd
 from sqlalchemy.orm import Session
 
 from api.services.claim_service import build_single_claim_analysis
+from api.services.historical_data_service import get_historical_data
 from db.database import SessionLocal
-from db.models import Notification, ScoringJob
+from db.models import Claim, Notification, ScoringJob
 from pipeline.pipeline import run_single
 
 
@@ -62,7 +64,7 @@ def run_pipeline_task(job_id: str, artifacts: dict, population_stats: dict) -> N
         _update_job(db, job, "processing", 35, "Running rules engine...")
         _update_job(db, job, "processing", 55, "Comparing with historical claims...")
         _update_job(db, job, "processing", 75, "Looking for unusual payment patterns...")
-        result = run_single(claim_input, artifacts, population_stats)
+        result = run_single(claim_input, artifacts, population_stats, _historical_claims_frame(db))
         result["ClaimId"] = job.generated_claim_id
 
         _update_job(db, job, "processing", 85, "Matching to known issue types...")
@@ -114,6 +116,47 @@ def assign_siu(db: Session, job: ScoringJob) -> dict:
         "assignedAt": job.assigned_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"),
         "status": "Investigating",
     }
+
+
+def _historical_claims_frame(db: Session) -> pd.DataFrame | None:
+    rows = db.query(Claim).all()
+    if rows:
+        return pd.DataFrame(
+            [
+                {
+                    "ClaimRecordId": claim.id,
+                    "ClaimId": claim.raw_claim_id,
+                    "ProviderId": claim.provider_id,
+                    "ProviderName": claim.provider_name,
+                    "ProcedureCode": claim.procedure_code,
+                    "ProcedureDesc": claim.procedure_desc,
+                    "BenefitType": claim.benefit_type,
+                    "ServiceCategoryName": claim.service_category_name,
+                    "BenefitCategoryName": claim.benefit_category_name,
+                    "ServiceMonth": claim.service_date,
+                    "AmtAllowed": claim.amt_allowed,
+                    "AmtCharged": claim.amt_charged,
+                    "Units": claim.units_used,
+                    "PatientAge": claim.member_age,
+                    "BilledAmountToAllowedRatio": claim.billed_amount_to_allowed_ratio,
+                    "Rule_Score_Norm": claim.rule_score_norm,
+                    "Claim_Stat_Score_Norm": claim.claim_stat_score_norm,
+                    "Provider_Stat_Score_Norm": claim.provider_stat_score_norm,
+                    "ML_Anomaly_Score_Norm": claim.ml_anomaly_score_norm,
+                    "Final_Combined_Score": claim.final_combined_score,
+                    "Final_Risk_Level": claim.final_risk_level,
+                    "Final_Fraud_Type": claim.final_fraud_type,
+                    "cluster_id": claim.cluster_id,
+                    "status": claim.status,
+                }
+                for claim in rows
+            ]
+        )
+
+    try:
+        return get_historical_data().claims_df
+    except Exception:
+        return None
 
 
 def _update_job(db: Session, job: ScoringJob, status: str, progress: int, stage: str) -> None:

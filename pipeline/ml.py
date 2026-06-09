@@ -133,21 +133,32 @@ def _ml_narrative(row: pd.Series) -> str:
     charged = float(row.get("AmtCharged", 0) or 0)
     ratio = float(row.get("BilledAmountToAllowedRatio", 0) or 0)
     procedure = row.get("ProcedureCode", "the submitted procedure")
+    payment_label = _concern_label(if_score)
+    detail_label = _concern_label(pca_score)
 
     if ml_score > config.ML_ANOMALY_FLAG_THRESHOLD:
-        strongest_signal = "payment amount pattern" if if_score >= pca_score else "claim feature reconstruction pattern"
         return (
-            f"ML anomaly checks are elevated for {procedure}: the combined ML score is {ml_score:.1f}/100, "
-            f"with Isolation Forest at {if_score:.1f}/100 and PCA reconstruction at {pca_score:.1f}/100. "
-            f"The strongest signal is the {strongest_signal}. The claim allowed amount is ${allowed:,.2f} "
-            f"against ${charged:,.2f} billed, a billed-to-allowed ratio of {ratio:.2f}, which makes the claim "
-            "worth manual review against comparable historical claims."
+            f"Pattern review is high concern for {procedure}: overall concern is {ml_score:.1f}/100. "
+            f"Payment behavior is {payment_label} and claim detail consistency is {detail_label}. "
+            f"The claim allowed amount is ${allowed:,.2f} against ${charged:,.2f} billed, "
+            f"with a billed-to-allowed ratio of {ratio:.2f}. The mix of amount, units, and billing details "
+            "is less consistent with comparable historical claims and should be manually reviewed."
         )
 
     return (
-        f"ML anomaly checks are not elevated for {procedure}: the combined ML score is {ml_score:.1f}/100, "
-        f"with Isolation Forest at {if_score:.1f}/100 and PCA reconstruction at {pca_score:.1f}/100. "
+        f"Pattern review is {_concern_label(ml_score)} for {procedure}: overall concern is {ml_score:.1f}/100. "
+        f"Payment behavior is {payment_label} and claim detail consistency is {detail_label}. "
         f"The allowed amount is ${allowed:,.2f} and the billed-to-allowed ratio is {ratio:.2f}, which remains "
-        "within the model's expected historical pattern."
+        "consistent with expected historical claim patterns."
     )
+
+
+def _concern_label(score: float) -> str:
+    if score >= 75:
+        return "high concern"
+    if score >= 50:
+        return "needs review"
+    if score >= 25:
+        return "on watch"
+    return "low concern"
 

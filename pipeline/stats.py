@@ -208,9 +208,17 @@ def _clip_score(raw: float, max_raw: Any) -> float:
 def _stat_narrative(row: pd.Series) -> str:
     signals = []
     if abs(float(row.get("Z_AllowedAmount", 0) or 0)) >= config.NARRATIVE_ZSCORE_THRESHOLD:
-        signals.append(f"Allowed amount is {row.get('Z_AllowedAmount', 0):.1f} SD from the population mean.")
+        signals.append(
+            f"Allowed amount is {_direction(row.get('Z_AllowedAmount', 0))} than expected for historical claims."
+        )
     if abs(float(row.get("Z_BilledToAllowed", 0) or 0)) >= config.NARRATIVE_ZSCORE_THRESHOLD:
-        signals.append(f"Billed-to-allowed ratio is {row.get('Z_BilledToAllowed', 0):.1f} SD from the population mean.")
+        signals.append(
+            f"Billed-to-allowed ratio is {_direction(row.get('Z_BilledToAllowed', 0))} than expected for historical claims."
+        )
     if abs(float(row.get("Z_Prov_Allowed", 0) or 0)) >= config.NARRATIVE_ZSCORE_THRESHOLD:
-        signals.append(f"Provider allowed amount behavior is {row.get('Z_Prov_Allowed', 0):.1f} SD from peers.")
+        signals.append(f"Provider allowed amount behavior is {_direction(row.get('Z_Prov_Allowed', 0))} than peer providers.")
     return " ".join(signals) if signals else "Claim and provider statistics are within expected ranges."
+
+
+def _direction(value: Any) -> str:
+    return "higher" if float(value or 0) > 0 else "lower"
