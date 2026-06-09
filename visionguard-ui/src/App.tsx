@@ -4,26 +4,15 @@
  */
 
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Layout } from './components/Layout';
-import ExecutiveDashboard from './pages/ExecutiveDashboard';
-import HistoricalClaimsExplorer from './pages/HistoricalClaimsExplorer';
-import ClaimInvestigationView from './pages/ClaimInvestigationView';
-import ProviderIntelligence from './pages/ProviderIntelligence';
 import NewClaimScoring from './pages/NewClaimScoring';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<ExecutiveDashboard />} />
-          <Route path="claims" element={<HistoricalClaimsExplorer />} />
-          <Route path="claims/:id" element={<ClaimInvestigationView />} />
-          <Route path="providers" element={<ProviderIntelligence />} />
-          <Route path="scoring" element={<NewClaimScoring />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <div className="relative h-screen w-full overflow-y-auto bg-[#05070a] px-4 py-6 text-slate-300 font-sans sm:px-6 lg:px-8">
+      <div className="pointer-events-none fixed inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#00f2ff 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+      <div className="relative z-10">
+        <NewClaimScoring />
+      </div>
+    </div>
   );
 }

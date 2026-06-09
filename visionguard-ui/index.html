@@ -1,22 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="theme-light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VisionGuardAI</title>
-    <script>
-      (() => {
-        try {
-          const savedTheme = localStorage.getItem('visionguard-theme');
-          const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-          if (savedTheme === 'light' || (!savedTheme && prefersLight)) {
-            document.documentElement.classList.add('theme-light');
-          }
-        } catch {
-          // Keep the default dark theme if browser preference storage is unavailable.
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

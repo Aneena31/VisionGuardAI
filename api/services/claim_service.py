@@ -348,7 +348,7 @@ def _history_level(score: float) -> str:
     if score >= 70:
         return "Very unusual"
     if score >= 40:
-        return "Somewhat unusual"
+        return "Moderate"
     return "Typical"
 
 
