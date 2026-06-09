@@ -106,7 +106,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {[
           { label: 'Total Claims Analyzed', value: (kpis?.totalClaimsAnalyzed?.value ?? 0).toLocaleString(), trend: `+${kpis?.totalClaimsAnalyzed?.trendPercent ?? 0}%`, icon: Activity, valueColor: 'text-white', trendColor: 'text-green-400', border: '' },
           { label: 'Total Allowed Amount', value: `$${Math.round((kpis?.totalAllowedAmount?.value ?? 0)).toLocaleString()}`, trend: `+${kpis?.totalAllowedAmount?.trendPercent ?? 0}%`, icon: DollarSign, valueColor: 'text-white', trendColor: 'text-green-400', border: '' },

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { ShieldAlert, BarChart3, Search, Users, Upload, Bell, ChevronRight, Zap, Moon, Sun } from 'lucide-react';
+import { BarChart3, Search, Users, Upload, Bell, ChevronRight, Zap, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './ui';
 import { api } from '../api';
@@ -38,7 +38,7 @@ export function Layout() {
       {/* Sidebar */}
       <nav className="w-64 border-r border-cyan-500/10 bg-slate-900/20 backdrop-blur-sm flex flex-col z-10 shrink-0">
         <div className="h-14 flex items-center px-6 border-b border-cyan-500/20">
-          <ShieldAlert className="w-6 h-6 text-cyan-400 mr-3" />
+          <img src="/visionguard-logo.svg" alt="VisionGuard AI" className="w-8 h-8 mr-3 shrink-0" />
           <h1 className="font-display font-bold text-xl tracking-tight text-white drop-shadow-[0_0_8px_rgba(0,242,255,0.7)]">
             VisionGuard <span className="text-cyan-400">AI</span>
           </h1>

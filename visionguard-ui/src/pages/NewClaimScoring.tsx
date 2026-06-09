@@ -285,8 +285,8 @@ export default function NewClaimScoring() {
       className="mx-auto max-w-6xl space-y-6 pb-12"
     >
       <div className="w-full">
-        <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">New Claim Review</h2>
-        <p className="text-slate-400 text-sm">Review a new claim for payment risk and investigation priority.</p>
+        <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">Claim Fraud Check</h2>
+        {/* <p className="text-slate-400 text-sm">Review a new claim for payment risk and investigation priority.</p> */}
       </div>
 
       <form onSubmit={analyzeClaim}>
@@ -508,7 +508,7 @@ export default function NewClaimScoring() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <GlassCard className="p-0 overflow-hidden border-orange-500/30 ring-1 ring-orange-500/10">
                 <div className="px-6 py-4 bg-slate-900/60">
                   <div className="flex items-center gap-4">
