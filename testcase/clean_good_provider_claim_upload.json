@@ -1,0 +1,17 @@
+{
+  "claim": {
+    "procedureCode": "V6396",
+    "procedureDesc": "Routine Vision Exam",
+    "allowedAmount": 100,
+    "amtCharged": 155.11,
+    "units": 1,
+    "memberAge": 35,
+    "memberGender": "Male",
+    "memberId": "MEM-TEST-CLEAN",
+    "providerId": "PRV-1621096",
+    "serviceDate": "2026-06-08",
+    "benefitType": "Exam",
+    "serviceCategoryName": "Dilated Fundus Exam",
+    "benefitCategoryName": "Vision Exam"
+  }
+}

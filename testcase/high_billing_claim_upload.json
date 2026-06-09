@@ -1,0 +1,17 @@
+{
+  "claim": {
+    "procedureCode": "92310",
+    "procedureDesc": "Contact Lens Fitting",
+    "allowedAmount": 475,
+    "amtCharged": 2375,
+    "units": 1,
+    "memberAge": 44,
+    "memberGender": "Female",
+    "memberId": "MEM-TEST-HIGH-BILLING",
+    "providerId": "PRV-1621096",
+    "serviceDate": "2026-06-08",
+    "benefitType": "Lens",
+    "serviceCategoryName": "contact lens",
+    "benefitCategoryName": "Ophthalmic Lenses"
+  }
+}
