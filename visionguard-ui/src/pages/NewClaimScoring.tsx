@@ -86,50 +86,34 @@ const scoreConcernLabel = (value: number) => {
   return 'Low concern';
 };
 
-const businessHistoricalNarrative = (rawNarrative: unknown, claimScore: number, providerScore: number) => {
+const businessHistoricalNarrative = (rawNarrative: unknown, claimScore: number) => {
   const narrative = typeof rawNarrative === 'string' ? rawNarrative.trim() : '';
-  if (narrative && !technicalNarrativePattern.test(narrative)) return narrative;
+  if (narrative && !technicalNarrativePattern.test(narrative) && !/\bprovider\b/i.test(narrative)) return narrative;
   const claimLabel = historyConcernLabel(claimScore).toLowerCase();
-  const providerLabel = historyConcernLabel(providerScore).toLowerCase();
-  if (claimScore >= 70 && providerScore >= 70) {
-    return 'Both the submitted claim and the provider billing profile are unusual compared with prior claim activity.';
-  }
   if (claimScore >= 70) {
     return 'The submitted claim billing profile is unusual compared with prior claims with similar billing characteristics.';
   }
-  if (providerScore >= 70) {
-    return 'The provider billing profile is unusual compared with peer providers.';
+  if (claimScore >= 40) {
+    return `The claim is ${claimLabel}; this is worth a business review but is not a high-concern historical mismatch.`;
   }
-  if (claimScore >= 40 || providerScore >= 40) {
-    return `The claim is ${claimLabel} and the provider is ${providerLabel}; this is worth a business review but is not a high-concern historical mismatch.`;
-  }
-  return 'The claim and provider look consistent with expected historical billing patterns.';
+  return 'The claim looks consistent with expected historical billing patterns.';
 };
 
-const businessPatternNarrative = (rawNarrative: unknown, patternScore: number) => {
-  const narrative = typeof rawNarrative === 'string' ? rawNarrative.trim() : '';
-  if (narrative && !technicalNarrativePattern.test(narrative)) return narrative;
+const businessPatternNarrative = (_rawNarrative: unknown, patternScore: number) => {
   if (patternScore >= 75) {
-    return 'The overall pattern score is high concern, which means the claim does not line up well with prior claim behavior and should be reviewed.';
+    return 'High concern; the claim differs from prior behavior and should be reviewed.';
   }
   if (patternScore >= 50) {
-    return 'The overall pattern score needs review because the claim has noticeable differences from prior claim behavior.';
+    return 'Needs review; the claim has noticeable differences from prior behavior.';
   }
   if (patternScore >= 25) {
-    return 'The overall pattern score is on watch, with some differences from prior claim behavior.';
+    return 'Watch; the claim has some differences from prior behavior.';
   }
-  return 'The overall pattern score is low concern and remains consistent with prior claim behavior.';
+  return 'Low concern; the claim is consistent with prior behavior.';
 };
 
 const formatCurrency = (value: unknown) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value || 0));
-
-const withCurrentAmount = (narrative: string, draft: ClaimDraft | null) => {
-  const chargedAmount = Number(draft?.amtCharged || 0);
-  if (!Number.isFinite(chargedAmount) || chargedAmount <= 0) return narrative;
-  if (/\b(current amount|amount charged|charged amount|billed amount)\b/i.test(narrative)) return narrative;
-  return `${narrative} Current amount charged is ${formatCurrency(chargedAmount)}.`;
-};
 
 export default function NewClaimScoring() {
   const [step, setStep] = useState<Step>('upload');
@@ -142,26 +126,21 @@ export default function NewClaimScoring() {
   const [selectedSampleId, setSelectedSampleId] = useState('');
   const [sampleLoading, setSampleLoading] = useState(true);
   const [claimDraft, setClaimDraft] = useState<ClaimDraft | null>(null);
-  const [submittedDraft, setSubmittedDraft] = useState<ClaimDraft | null>(null);
   const [assignmentState, setAssignmentState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const scoredClaim = result?.claim;
   const scoredAnalysis = result?.analysis;
   const aiSummary = scoredAnalysis?.aiSummary;
   const triggeredRules = scoredAnalysis?.rulesAnalysis?.triggeredRules || [];
+  const failedRuleCount = Number(scoredAnalysis?.rulesAnalysis?.failedRules ?? triggeredRules.length ?? 0);
   const statisticalAnalysis = scoredAnalysis?.statisticalAnalysis || {};
   const mlAnalysis = scoredAnalysis?.mlAnalysis || {};
   const claimPatternScore = Number(statisticalAnalysis?.claimPatternScore ?? 0);
-  const providerPatternScore = Number(statisticalAnalysis?.providerPatternScore ?? 0);
   const claimHistoryLevel = statisticalAnalysis?.claimPatternLevel || historyConcernLabel(claimPatternScore);
-  const providerHistoryLevel = statisticalAnalysis?.providerPatternLevel || historyConcernLabel(providerPatternScore);
-  const historicalNarrative = businessHistoricalNarrative(statisticalAnalysis?.narrative, claimPatternScore, providerPatternScore);
+  const historicalNarrative = businessHistoricalNarrative(statisticalAnalysis?.narrative, claimPatternScore);
   const isolationForestScore = Number(mlAnalysis?.isolationForestScore || 0);
   const pcaErrorScore = Number(mlAnalysis?.pcaErrorScore || 0);
   const mlAnomalyScore = Number(mlAnalysis?.anomalyScore || 0);
-  const patternNarrative = withCurrentAmount(
-    businessPatternNarrative(mlAnalysis?.modelSummary, mlAnomalyScore),
-    submittedDraft
-  );
+  const patternNarrative = businessPatternNarrative(mlAnalysis?.modelSummary, mlAnomalyScore);
   const clusterAssignment = scoredAnalysis?.clusterAssignment;
   const closestCase = clusterAssignment?.closestCase;
   const fraudScore = Number(scoredClaim?.fraudScore || 0);
@@ -200,7 +179,6 @@ export default function NewClaimScoring() {
     setResult(null);
     setJobId(null);
     setProcessingProgress(0);
-    setSubmittedDraft(null);
     setAssignmentState('idle');
   };
 
@@ -210,7 +188,6 @@ export default function NewClaimScoring() {
       setUploadError('Choose a testcase before analyzing.');
       return;
     }
-    setSubmittedDraft(claimDraft);
     startSampleProcessing(claimDraft);
   };
 
@@ -527,20 +504,20 @@ export default function NewClaimScoring() {
                     <div>
                       <h3 className="font-bold text-white text-sm">Rules Engine</h3>
                       <p className="text-xs text-slate-400">
-                        {triggeredRules.length > 0 ? `${triggeredRules.length} check${triggeredRules.length === 1 ? '' : 's'} need attention` : 'No rules violated'}
+                        {failedRuleCount > 0 ? `${failedRuleCount} check${failedRuleCount === 1 ? '' : 's'} need attention` : 'No rules violated'}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Billing Concern</div>
-                      <div className="text-2xl font-bold text-orange-500">{scoreConcernLabel(Number(scoredAnalysis?.rulesAnalysis?.ruleScore || 0))}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="min-h-[92px] bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center flex flex-col justify-center">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Checks Triggered</div>
+                      <div className="text-3xl font-display font-bold text-orange-500">{failedRuleCount}</div>
                     </div>
-                    <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Review Priority</div>
-                      <div className="text-2xl font-bold text-white">{scoredAnalysis?.rulesAnalysis?.severity || 'Low'}</div>
+                    <div className="min-h-[92px] bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center flex flex-col justify-center">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Severity</div>
+                      <div className="text-3xl font-display font-bold text-white">{scoredAnalysis?.rulesAnalysis?.severity || 'Low'}</div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -567,20 +544,20 @@ export default function NewClaimScoring() {
                     </div>
                     <div>
                       <h3 className="font-bold text-white text-sm">Historical Comparison</h3>
-                      <p className="text-xs text-slate-400">Claim is {String(claimHistoryLevel).toLowerCase()} | Provider is {String(providerHistoryLevel).toLowerCase()}</p>
+                      <p className="text-xs text-slate-400">Claim is {String(claimHistoryLevel).toLowerCase()}</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-6 border-t border-slate-800/50 bg-slate-900/40 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Claim Billing vs History</div>
-                    <div className="text-3xl font-display font-bold text-cyan-400">{claimHistoryLevel}</div>
-                    <div className="mt-1 text-[11px] font-medium text-slate-500">Concern {Math.round(claimPatternScore)}/100</div>
-                  </div>
-                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
-                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Provider Billing vs Peers</div>
-                    <div className="text-3xl font-display font-bold text-cyan-400">{providerHistoryLevel}</div>
-                    <div className="mt-1 text-[11px] font-medium text-slate-500">Concern {Math.round(providerPatternScore)}/100</div>
+                <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="min-h-[92px] bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center flex flex-col justify-center">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Billing Pattern</div>
+                      <div className="text-3xl font-display font-bold text-cyan-400">{claimHistoryLevel}</div>
+                    </div>
+                    <div className="min-h-[92px] bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center flex flex-col justify-center">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Score</div>
+                      <div className="text-3xl font-display font-bold text-cyan-400">{Math.round(claimPatternScore)}/100</div>
+                    </div>
                   </div>
                   <div className="md:col-span-2 text-xs text-slate-400 leading-relaxed p-3 bg-slate-900 rounded border border-slate-800">
                     <strong className="text-white">What this means:</strong> {historicalNarrative}
@@ -595,26 +572,29 @@ export default function NewClaimScoring() {
                       <BrainCircuit className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-sm">Unusual Pattern Review</h3>
+                      <h3 className="font-bold text-white text-sm">Claim Pattern Review</h3>
                       <p className="text-xs text-slate-400">{scoreConcernLabel(mlAnomalyScore)} based on prior claim behavior</p>
                     </div>
                   </div>
                 </div>
                 <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Overall Pattern Concern</div>
-                      <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(mlAnomalyScore)}</div>
-                      <div className="mt-1 text-[11px] font-medium text-slate-500">Score {Math.round(mlAnomalyScore)}/100</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Overall Pattern Concern</div>
+                      <div className="text-3xl font-display font-bold text-purple-400">{scoreConcernLabel(mlAnomalyScore)}</div>
                     </div>
-                    <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+                    <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Score</div>
+                      <div className="text-3xl font-display font-bold text-purple-400">{Math.round(mlAnomalyScore)}/100</div>
+                    </div>
+                    {/* <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
                       <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Payment Behavior</div>
                       <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(isolationForestScore)}</div>
                     </div>
                     <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800">
                       <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Claim Detail Consistency</div>
                       <div className="text-lg font-bold text-purple-400">{scoreConcernLabel(pcaErrorScore)}</div>
-                    </div>
+                    </div> */}
                   </div>
                   <div className="text-xs text-slate-400 leading-relaxed p-3 bg-slate-900 rounded border border-slate-800">
                     <strong className="text-white">Pattern Summary:</strong> {patternNarrative}

@@ -240,7 +240,7 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None, 
                 "providerPatternScore": provider_pattern_score,
                 "claimPatternLevel": _history_level(claim_pattern_score),
                 "providerPatternLevel": _history_level(provider_pattern_score),
-                "narrative": _business_stat_narrative(claim, claim_pattern_score, provider_pattern_score),
+                "narrative": _business_stat_narrative(claim, claim_pattern_score),
                 "providerPercentile": min(100, round((claim.provider_stat_score or 0), 1)),
             },
             "mlAnalysis": {
@@ -409,7 +409,7 @@ def _history_level(score: float) -> str:
         return "Very unusual"
     if score >= 40:
         return "Moderate"
-    return "Typical"
+    return "Normal"
 
 
 def _score_concern_label(score: float) -> str:
@@ -422,22 +422,19 @@ def _score_concern_label(score: float) -> str:
     return "Low concern"
 
 
-def _business_stat_narrative(claim: Claim, claim_score: float, provider_score: float) -> str:
+def _business_stat_narrative(claim: Claim, claim_score: float) -> str:
     signals = []
     _add_history_signal(signals, claim.z_allowed_amount, "Allowed amount", "historical claims")
     _add_history_signal(signals, getattr(claim, "z_billed_to_allowed", 0), "Billed-to-allowed ratio", "historical claims")
     _add_history_signal(signals, getattr(claim, "z_units", 0), "Units billed", "historical claims")
-    _add_history_signal(signals, getattr(claim, "z_prov_allowed", 0), "Provider allowed amount behavior", "peer providers")
 
     if signals:
         return " ".join(signals)
     if claim_score >= 70:
         return "The overall claim billing profile is unusual compared with historical claims."
-    if provider_score >= 70:
-        return "The provider's billing profile is unusual compared with peer providers."
-    if claim_score >= 40 or provider_score >= 40:
-        return "The claim or provider has some differences from prior patterns, but not enough to make this a high-concern historical match."
-    return "The claim and provider look consistent with expected historical billing patterns."
+    if claim_score >= 40:
+        return "The claim has some differences from prior patterns, but not enough to make this a high-concern historical match."
+    return "The claim looks consistent with expected historical billing patterns."
 
 
 def _add_history_signal(signals: list[str], value: Any, label: str, comparison_group: str) -> None:
@@ -453,28 +450,12 @@ def _add_history_signal(signals: list[str], value: Any, label: str, comparison_g
 
 def _business_ml_narrative(claim: Claim) -> str:
     score = _score_value(getattr(claim, "ml_anomaly_score_norm", None), claim.ml_anomaly_score)
-    payment_score = _score_value(claim.if_score_norm)
-    detail_score = _score_value(claim.pca_score_norm)
     procedure = claim.procedure_code or "this procedure"
-    allowed = claim.amt_allowed or 0
-    ratio = claim.billed_amount_to_allowed_ratio or 0
-    lead = f"Pattern review is {_concern_phrase(score)} for {procedure}: overall concern is {score:.1f}/100."
-    detail = (
-        f" Payment behavior is {_concern_phrase(payment_score)} and claim detail consistency is "
-        f"{_concern_phrase(detail_score)}. Allowed amount is ${allowed:,.2f} and billed-to-allowed ratio is {ratio:.2f}."
-    )
     if score >= 70:
-        return lead + detail + " The combination is less consistent with prior claim behavior and should be manually reviewed."
+        return f"High concern for {procedure}; the claim differs from prior behavior and should be reviewed."
     if score >= 40:
-        return lead + detail + " The claim has some differences from prior claim behavior and is worth a closer look."
-    return lead + detail + " The claim remains consistent with prior claim behavior."
-
-
-def _concern_phrase(score: float) -> str:
-    label = _score_concern_label(score)
-    if label == "Watch":
-        return "on watch"
-    return label.lower()
+        return f"Needs review for {procedure}; the claim has noticeable differences from prior behavior."
+    return f"Low concern for {procedure}; the claim is consistent with prior behavior."
 
 
 def _cluster_claim_count(historical_data: Any, cluster_id: str) -> int:
