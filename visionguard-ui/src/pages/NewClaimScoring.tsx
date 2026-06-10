@@ -572,7 +572,7 @@ export default function NewClaimScoring() {
                       <BrainCircuit className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-sm">Claim Pattern Review</h3>
+                      <h3 className="font-bold text-white text-sm">Claim Pattern Analysis</h3>
                       <p className="text-xs text-slate-400">{scoreConcernLabel(mlAnomalyScore)} based on prior claim behavior</p>
                     </div>
                   </div>
@@ -580,7 +580,7 @@ export default function NewClaimScoring() {
                 <div className="p-6 border-t border-slate-800/50 bg-slate-900/40">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">
-                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Overall Pattern Concern</div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Anomaly Detected</div>
                       <div className="text-3xl font-display font-bold text-purple-400">{scoreConcernLabel(mlAnomalyScore)}</div>
                     </div>
                     <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-800 text-center">

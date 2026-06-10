@@ -406,20 +406,20 @@ def _score_value(*values: Any) -> float:
 
 def _history_level(score: float) -> str:
     if score >= 70:
-        return "Very unusual"
+        return "Extremely Unusual"
     if score >= 40:
-        return "Moderate"
+        return "Unusual"
     return "Normal"
 
 
 def _score_concern_label(score: float) -> str:
     if score >= 75:
-        return "High concern"
+        return "Extremely Abnormal"
     if score >= 50:
-        return "Needs review"
+        return "Significant Deviation from normal"
     if score >= 25:
-        return "Watch"
-    return "Low concern"
+        return "Minor Deviation from normal"
+    return "No"
 
 
 def _business_stat_narrative(claim: Claim, claim_score: float) -> str:
