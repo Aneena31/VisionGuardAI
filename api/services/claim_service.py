@@ -248,7 +248,7 @@ def build_claim_analysis(claim: Claim, provider: Optional[ProviderGold] = None, 
                 "isolationForestScore": claim.if_score_norm or 0,
                 "pcaErrorScore": claim.pca_score_norm or 0,
                 "concernLevel": _score_concern_label(ml_pattern_score),
-                "modelSummary": _business_ml_narrative(claim),
+                "modelSummary": _pattern_summary(ai_summary, claim),
             },
             "clusterAssignment": {
                 "clusterId": claim.cluster_id or "CL-00",
@@ -456,6 +456,14 @@ def _business_ml_narrative(claim: Claim) -> str:
     if score >= 40:
         return f"Needs review for {procedure}; the claim has noticeable differences from prior behavior."
     return f"Low concern for {procedure}; the claim is consistent with prior behavior."
+
+
+def _pattern_summary(ai_summary: Any, claim: Claim) -> str:
+    if isinstance(ai_summary, dict):
+        pattern_summary = str(ai_summary.get("patternSummary") or "").strip()
+        if pattern_summary:
+            return pattern_summary
+    return _business_ml_narrative(claim)
 
 
 def _cluster_claim_count(historical_data: Any, cluster_id: str) -> int:

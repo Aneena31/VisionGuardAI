@@ -99,17 +99,9 @@ const businessHistoricalNarrative = (rawNarrative: unknown, claimScore: number) 
   return 'The claim looks consistent with expected historical billing patterns.';
 };
 
-const businessPatternNarrative = (_rawNarrative: unknown, patternScore: number) => {
-  if (patternScore >= 75) {
-    return 'High concern; the claim differs from prior behavior and should be reviewed.';
-  }
-  if (patternScore >= 50) {
-    return 'Needs review; the claim has noticeable differences from prior behavior.';
-  }
-  if (patternScore >= 25) {
-    return 'Watch; the claim has some differences from prior behavior.';
-  }
-  return 'Low concern; the claim is consistent with prior behavior.';
+const displayNarrative = (rawNarrative: unknown, fallback: string) => {
+  const narrative = typeof rawNarrative === 'string' ? rawNarrative.trim() : '';
+  return narrative || fallback;
 };
 
 const formatCurrency = (value: unknown) =>
@@ -140,7 +132,7 @@ export default function NewClaimScoring() {
   const isolationForestScore = Number(mlAnalysis?.isolationForestScore || 0);
   const pcaErrorScore = Number(mlAnalysis?.pcaErrorScore || 0);
   const mlAnomalyScore = Number(mlAnalysis?.anomalyScore || 0);
-  const patternNarrative = businessPatternNarrative(mlAnalysis?.modelSummary, mlAnomalyScore);
+  const patternNarrative = displayNarrative(aiSummary?.patternSummary || mlAnalysis?.modelSummary, 'No pattern summary returned for this claim.');
   const clusterAssignment = scoredAnalysis?.clusterAssignment;
   const closestCase = clusterAssignment?.closestCase;
   const fraudScore = Number(scoredClaim?.fraudScore || 0);

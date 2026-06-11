@@ -12,9 +12,10 @@ from pipeline import config
 
 SYSTEM_PROMPT = """You are a healthcare fraud analyst AI assistant for an insurance SIU team.
 Given structured claim analysis data, generate a concise professional investigation summary.
-Use business language for analysts. Do not mention z-score, SD, mean, Isolation Forest, PCA, reconstruction, or model internals.
-Respond ONLY with valid JSON. Keys: summary, riskReasoning, recommendation.
-Each value must be a string under 100 words. Do not include any other text."""
+Use business language for analysts. Do not mention procedure code, z-score, SD, mean, Isolation Forest, PCA, reconstruction, or model internals.
+Respond ONLY with valid JSON. Keys: summary, riskReasoning, recommendation, patternSummary.
+Each value must be a string under 100 words. Do not include any other text.
+The patternSummary must use a professional enterprise fraud review tone and clearly explain: the detected pattern concern, the key contributing factors, and the recommended review actions. Keep it natural, actionable, concise, and easy for claim reviewers to understand. Do not mention procedure codes."""
 
 PROVIDER_SYSTEM_PROMPT = """You are a healthcare fraud analyst AI assistant for an insurance SIU team.
 Given provider-level claims analytics, generate concise provider monitoring guidance.
@@ -45,7 +46,7 @@ Claim Analysis:
 - Risk Level: {claim_data.get('Final_Risk_Level')}
 - Suspected Fraud Type: {claim_data.get('Final_Fraud_Type')}
 
-Generate the investigation summary JSON.
+Generate the investigation summary JSON. For patternSummary, avoid repetitive wording, robotic phrases, overly technical language, and procedure codes.
 """
     try:
         client = OpenAI(api_key=api_key, base_url=OPENAI_BASE_URL)
@@ -64,6 +65,7 @@ Generate the investigation summary JSON.
             "summary": str(parsed.get("summary", "")),
             "riskReasoning": str(parsed.get("riskReasoning", "")),
             "recommendation": str(parsed.get("recommendation", "")),
+            "patternSummary": str(parsed.get("patternSummary", "")),
             "llmGenerated": True,
             "model": model,
         }
@@ -171,6 +173,7 @@ def _fallback_summary(claim_data: dict) -> dict:
             if risk_level in ["High", "Critical"]
             else "Continue standard adjudication, retaining the generated reasoning for audit trail review."
         ),
+        "patternSummary": _fallback_pattern_summary(claim_data),
     }
 
 
@@ -179,7 +182,37 @@ def _low_risk_summary() -> dict:
         "summary": "Low risk claim. No significant fraud indicators detected.",
         "riskReasoning": "Rule, historical comparison, and pattern checks stayed within configured thresholds.",
         "recommendation": "Auto-adjudicate.",
+        "patternSummary": (
+            "Pattern review did not identify a material behavioral concern. Amount, unit, and claim detail signals are aligned with expected activity; proceed through standard adjudication controls."
+        ),
     }
+
+
+def _fallback_pattern_summary(claim_data: dict) -> str:
+    ml_score = float(claim_data.get("ML_Anomaly_Score_Norm", claim_data.get("ML_Anomaly_Score", 0)) or 0)
+    payment_score = float(claim_data.get("IF_Score_Norm", 0) or 0)
+    detail_score = float(claim_data.get("PCA_Score_Norm", 0) or 0)
+
+    factors = []
+    if payment_score >= 50:
+        factors.append("payment behavior is outside the expected range")
+    if detail_score >= 50:
+        factors.append("claim details do not fully align with prior patterns")
+    if not factors:
+        factors.append("amount, unit, and service detail signals remain generally consistent")
+
+    if ml_score >= 50:
+        return (
+            "Pattern review indicates elevated concern based on how this claim compares with prior billing behavior. "
+            f"Key contributors include {', and '.join(factors)}, which may point to a change in billing profile or documentation support. "
+            "Reviewers should verify the submitted documentation, unit count, allowed amount, and provider billing context before release."
+        )
+
+    return (
+        "Pattern review does not indicate a material behavioral concern. "
+        f"The main signals show that {', and '.join(factors)}. "
+        "Reviewers can continue standard adjudication unless rules, history, or provider context raise a separate concern."
+    )
 
 
 def _fallback_provider_summary(provider_data: dict) -> dict:
